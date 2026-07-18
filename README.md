@@ -46,6 +46,20 @@
 
 一键打包：`Windows/build.bat` → 产出 `dist\WangAnZhiDun.exe`。
 
+### 已编译成品下载（GitHub Actions 自动构建）
+
+无需本地安装 Python，直接下载成品即可使用。**每次推送到 `main` 都会自动构建并发布**：
+
+- 发布页（含所有历史版本）：<https://github.com/Oseter/wanganzhidun/releases>
+- 最新版（推荐）：<https://github.com/Oseter/wanganzhidun/releases/latest>
+
+| 文件 | 说明 |
+|------|------|
+| `WangAnZhiDun-Setup.exe` | **安装包（推荐）**：安装到 `%LOCALAPPDATA%`，无需管理员权限，含开始菜单 / 桌面快捷方式 / 卸载程序 |
+| `WangAnZhiDun.exe` | 单文件便携版：解压即用，常驻系统托盘 |
+
+> 注：安装包与便携版二进制一致，差异仅在安装/卸载流程。首次运行需在系统设置中允许「通知访问」权限，工具才能读取 QQ/微信 通知栏。
+
 ---
 
 ## 标准弹药格式（同谐命途维护，全体系共享）
