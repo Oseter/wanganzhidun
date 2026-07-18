@@ -54,7 +54,7 @@
 
 ## 六、当前开发重点
 
-- **网安智盾（存护·高级）**：交付物为 WangAnZhiDun.exe（PC 后台监测，Python + PyInstaller，监听通知栏、截图、录屏、OBS 对接）、wang-an-zhi-dun.crx（Chrome 扩展，表单自动填充 12377 与卫士）、WangAnZhiDun.apk（Android 端，NotificationListener、AccessibilityService、MediaProjection）、config.ini、技术白皮书。技术栈：Python、JS MV3、Kotlin、SQLite、OBS WebSocket。开发阶段：PC 监测取证、浏览器插件、APK、全自动反伤闭环。
+- **网安智盾（存护·高级）**：交付物为 WangAnZhiDun.exe（PC 后台监测，Python + PyInstaller，监听通知栏、截图、**内置循环缓冲录屏（无需 OBS）**）、wang-an-zhi-dun.crx（Chrome 扩展，表单自动填充 12377 与卫士）、WangAnZhiDun.apk（Android 端，NotificationListener、AccessibilityService、MediaProjection 循环缓冲录屏）、config.ini、技术白皮书。技术栈：Python、JS MV3、Kotlin、SQLite、Room、MediaProjection。开发阶段：PC 监测取证、浏览器插件、APK、全自动反伤闭环。
 - **全频道频带阻塞干扰（虚无·高级）**：闭源软件，四频道实现。对方干扰网信办时对等反干扰。
 - **复活甲（丰饶·高级）**：三形态，与网安智盾接力，存护没防住则复活甲启动。
 

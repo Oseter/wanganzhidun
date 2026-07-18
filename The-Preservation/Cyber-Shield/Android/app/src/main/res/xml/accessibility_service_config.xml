@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/service_accessibility_label"
+    android:packageNames="@null"
+    android:accessibilityEventTypes="typeWindowContentChanged|typeViewTextChanged|typeNotificationStateChanged"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="120"
+    android:canRetrieveWindowContent="true"
+    android:settingsActivityName="com.wanganzhidun.MainActivity" />

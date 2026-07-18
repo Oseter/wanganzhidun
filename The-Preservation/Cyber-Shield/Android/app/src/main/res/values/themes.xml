@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.WangAnZhiDun" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/shield_primary</item>
+        <item name="colorPrimaryVariant">@color/shield_primary_variant</item>
+        <item name="colorSecondary">@color/shield_accent</item>
+        <item name="android:colorBackground">@color/shield_bg</item>
+        <item name="colorSurface">@color/shield_surface</item>
+        <item name="colorOnSurface">@color/shield_text</item>
+        <item name="colorOnBackground">@color/shield_text</item>
+        <item name="android:statusBarColor">@color/shield_bg</item>
+        <item name="android:navigationBarColor">@color/shield_bg</item>
+    </style>
+
+    <style name="Theme.WangAnZhiDun.Transparent" parent="Theme.Material3.DayNight.Dialog.Alert">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
+</resources>

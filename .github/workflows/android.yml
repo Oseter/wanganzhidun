@@ -1,0 +1,33 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'The-Preservation/Cyber-Shield/Android/**'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build release APK
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: '8.9'
+          build-root-directory: The-Preservation/Cyber-Shield/Android
+          arguments: ':app:assembleRelease'
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WangAnZhiDun-apk
+          path: The-Preservation/Cyber-Shield/Android/app/build/outputs/apk/release/*.apk

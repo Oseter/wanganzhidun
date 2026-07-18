@@ -1,0 +1,45 @@
+<resources>
+    <string name="app_name">网安智盾</string>
+    <string name="app_full_name">网安智盾 · 存护</string>
+
+    <string name="service_notification_label">网安智盾 · 通知监听</string>
+    <string name="service_accessibility_label">网安智盾 · 聊天读取</string>
+
+    <string name="status_listener">通知监听</string>
+    <string name="status_accessibility">聊天读取</string>
+    <string name="status_capture">循环录屏</string>
+    <string name="status_on">运行中</string>
+    <string name="status_off">未启用</string>
+
+    <string name="btn_start_capture">启动录屏</string>
+    <string name="btn_stop_capture">停止录屏</string>
+    <string name="btn_open_evidence">证据目录</string>
+    <string name="btn_test_forensics">测试取证</string>
+    <string name="btn_open_settings">关键词设置</string>
+
+    <string name="hint_enable_listener">请在「通知使用权」中启用本应用</string>
+    <string name="hint_enable_accessibility">请在「无障碍」中启用聊天读取服务</string>
+    <string name="hint_enable_capture">录屏需要屏幕捕获授权</string>
+
+    <string name="recent_events">最近取证</string>
+    <string name="empty_events">暂无取证记录</string>
+
+    <string name="legal_note">存护底线：仅对恶俗目标取证，反伤须手动确认，不伪造证据。</string>
+
+    <string name="notify_channel_forensics">取证提示</string>
+    <string name="notify_channel_capture">录屏状态</string>
+
+    <string name="forensics_title">命中违规内容</string>
+    <string name="forensics_tap_confirm">点击确认后跳转举报通道</string>
+    <string name="action_confirm_report">确认举报</string>
+    <string name="action_dismiss">忽略</string>
+
+    <string name="capture_running">循环缓冲录屏运行中</string>
+    <string name="capture_stopped">录屏已停止</string>
+
+    <string name="report_12377">网信办 12377</string>
+    <string name="report_guard">腾讯卫士</string>
+    <string name="report_choose">选择举报通道</string>
+
+    <string name="ammo_format_hint">标准弹药：目标账号|时间|违规内容|对应条款|证据附件</string>
+</resources>

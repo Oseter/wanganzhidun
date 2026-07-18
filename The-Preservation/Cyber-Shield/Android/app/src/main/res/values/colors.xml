@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 70% 主色：深空蓝（存护底色） -->
+    <color name="shield_bg">#0B1220</color>
+    <color name="shield_surface">#131C2E</color>
+    <color name="shield_surface_2">#1B273F</color>
+
+    <!-- 20% 次色：青蓝（科技感） -->
+    <color name="shield_primary">#2DD4BF</color>
+    <color name="shield_primary_variant">#14B8A6</color>
+
+    <!-- 10% 点缀：琥珀（CTA / 警示） -->
+    <color name="shield_accent">#FBBF24</color>
+    <color name="shield_danger">#F87171</color>
+
+    <color name="shield_text">#E6EDF6</color>
+    <color name="shield_text_muted">#8A98AD</color>
+
+    <color name="status_ok">#34D399</color>
+    <color name="status_bad">#64748B</color>
+</resources>

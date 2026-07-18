@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- 禁用云备份，保护证据隐私 -->
+    </cloud-backup>
+    <device-transfer>
+        <!-- 设备迁移同样禁用 -->
+    </device-transfer>
+</data-extraction-rules>
