@@ -30,7 +30,7 @@ class UIManager:
 
     POLL_MS = 40  # UI 线程泵轮询间隔
 
-    def __init__(self, callbacks: Dict):
+    def __init__(self, callbacks: Dict, start_minimized: bool = False):
         self.cb = callbacks
         self.root: Optional[tk.Tk] = None
         self._main = None
@@ -39,6 +39,7 @@ class UIManager:
         self._ready = threading.Event()
         self._config_dlg = None
         self._running = True
+        self._start_minimized = start_minimized
         # 跨线程安全投递队列：所有 UI 操作都进这里，由 UI 线程泵取出执行
         self._queue: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
@@ -63,6 +64,12 @@ class UIManager:
 
         self._main = MainWindow(self.root, {**self.cb, "logo": self.logo})
         self._ready.set()
+        # 开机自启场景：启动即隐藏到托盘，仅留系统托盘常驻
+        if self._start_minimized:
+            try:
+                self.root.withdraw()
+            except Exception:
+                pass
         # 启动队列泵（root.after 仅在 UI 线程内调用，安全）
         self.root.after(self.POLL_MS, self._pump)
         self.root.mainloop()

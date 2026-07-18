@@ -184,7 +184,7 @@ class WangAnZhiDun:
         )
 
     # ---------- 生命周期 ----------
-    def start(self):
+    def start(self, start_minimized: bool = False):
         # UI 管理器（统一 Tk 根，独立 UI 线程）先建实例，避免监听线程
         # 在 UI 就绪前触发时 self.ui 为 None
         self.ui = UIManager({
@@ -195,7 +195,7 @@ class WangAnZhiDun:
             "on_quit": self.stop,
             "on_close": self._hide_ui,
             "on_refresh": self._refresh_state,
-        })
+        }, start_minimized=start_minimized)
 
         # 启动自带循环缓冲录屏（不依赖任何外部应用）
         self.recorder.start()
@@ -229,9 +229,13 @@ class WangAnZhiDun:
 
 
 def main():
+    # 开机自启：安装向导写入的 Run 项带 --minimized，启动即最小化到托盘
+    start_minimized = any(
+        a in ("--minimized", "--startup", "-m") for a in sys.argv[1:]
+    )
     app = WangAnZhiDun()
     try:
-        app.start()
+        app.start(start_minimized=start_minimized)
         # 保持主线程存活
         while True:
             time.sleep(1)
