@@ -25,7 +25,9 @@ ArchitecturesInstallIn64BitMode=x64
 UninstallDisplayIcon={app}\{#MyExe}
 
 [Languages]
-Name: "ChineseSimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+; 注：本环境 Inno Setup 未自带中文语言包。应用内 UI 为中文，
+; 安装向导暂用英文（Default.isl）。如需中文安装界面，把官方
+; ChineseSimplified.isl 放入 Languages\ 后改回对应 MessagesFile 即可。
 Name: "English"; MessagesFile: "compiler:Default.isl"
 
 [Files]
