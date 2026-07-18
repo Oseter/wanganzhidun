@@ -1,0 +1,26 @@
+# 网安智盾 Windows 版 — Python 依赖
+# 适配 Python 3.11，目标平台 Windows 10/11
+# 安装：pip install -r requirements.txt
+
+# 系统托盘（常驻后台）
+pystray==0.19.5
+
+# 图像处理 / 多显示器截图
+Pillow==10.4.0
+mss==9.0.1
+
+# 自带循环缓冲录屏（无需 OBS 等外部应用）
+# opencv-python-headless 自带 ffmpeg 编码器，随 exe 打包
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+
+# Windows 通知监听（QQ/微信通知中心）
+# 仅 Windows 生效；非 Windows 环境自动降级为轮询模式
+winrt-Windows.UI.Notifications==2.0.1
+winsdk==0.8.1
+
+# 本地证据加密（AES / Fernet）
+cryptography==43.0.0
+
+# 打包（不在运行时依赖，仅打包用）
+# pyinstaller==6.10.0

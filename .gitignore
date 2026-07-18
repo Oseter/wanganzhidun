@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+dist/
+build/
+*.spec.bak
+
+# 运行时产物（含敏感证据，绝不入库）
+*.db
+evidence/
+logs/
+reports/
+*.enc
+crypto_key.bin
+crypto_salt.bin
+injection_queue.txt
+
+# 系统
+.DS_Store
+Thumbs.db
