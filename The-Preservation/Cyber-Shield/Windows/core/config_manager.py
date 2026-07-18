@@ -4,16 +4,32 @@
 """
 import configparser
 import os
+import sys
 from typing import List
 
 
 class ConfigManager:
     """封装 config.ini 的读写，提供类型化访问接口。"""
 
-    DEFAULT_PATH = os.path.join(os.path.dirname(__file__), "..", "config.ini")
+    @staticmethod
+    def _default_path() -> str:
+        """按优先级查找 config.ini，兼容 开发 / 打包 / 安装 三种运行环境。"""
+        candidates = [
+            # 打包或安装后：exe 同级（安装包会把 config.ini 放在这里）
+            os.path.join(os.path.dirname(sys.executable), "config.ini"),
+            # PyInstaller 单文件解包目录
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini"),
+            # 开发期：脚本上级目录
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "config.ini"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        # 默认落在 exe 同级，便于用户修改后由程序读取
+        return candidates[0]
 
     def __init__(self, path: str = None):
-        self.path = os.path.abspath(path or self.DEFAULT_PATH)
+        self.path = os.path.abspath(path or self._default_path())
         self._parser = configparser.ConfigParser()
         if not os.path.exists(self.path):
             raise FileNotFoundError(f"配置文件不存在：{self.path}")

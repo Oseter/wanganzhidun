@@ -31,11 +31,29 @@ jobs:
         working-directory: The-Preservation/Cyber-Shield/Windows
         run: pyinstaller build.spec
 
-      - name: Upload build artifact
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer (WangAnZhiDun-Setup.exe)
+        working-directory: The-Preservation/Cyber-Shield/Windows
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
+          if (-not $iscc) { $iscc = Get-Command iscc -ErrorAction SilentlyContinue }
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          & $iscc.FullName installer.iss
+
+      - name: Upload exe artifact
         uses: actions/upload-artifact@v4
         with:
           name: WangAnZhiDun.exe
           path: The-Preservation/Cyber-Shield/Windows/dist/WangAnZhiDun.exe
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WangAnZhiDun-Setup.exe
+          path: The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
@@ -44,8 +62,12 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: WangAnZhiDun 自动构建 #${{ github.run_number }}
           body: |
-            自动构建的 WangAnZhiDun.exe（Windows 64位）。
+            网安智盾 WangAnZhiDun 自动构建（Windows 64位）。
+            - WangAnZhiDun-Setup.exe：安装包（推荐，含开始菜单/桌面快捷方式/卸载）
+            - WangAnZhiDun.exe：单文件便携版
             常驻系统托盘，监听 QQ/微信 通知栏，关键词触发截图+自带录屏+证据归档。
-          files: The-Preservation/Cyber-Shield/Windows/dist/WangAnZhiDun.exe
+          files: |
+            The-Preservation/Cyber-Shield/Windows/dist/WangAnZhiDun.exe
+            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

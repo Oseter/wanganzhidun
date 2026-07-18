@@ -47,9 +47,14 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 打包为 exe（零代码用户最终交付）
+## 打包（exe / 安装包）
 
-双击 `build.bat`，自动在 `dist\WangAnZhiDun.exe` 产出单文件程序。
+- **安装包（推荐普通用户）**：`build.bat` 跑完后，用 Inno Setup 编译 `installer.iss`
+  得到 `installer\WangAnZhiDun-Setup.exe`——带开始菜单/桌面快捷方式/卸载入口，免管理员安装。
+- **单文件便携版**：`dist\WangAnZhiDun.exe`。
+
+CI（GitHub Actions）已配置：推到 `main` 自动构建并发布上述两个产物到 Releases。
+
 首次运行会在系统设置中授权"读取通知"。
 
 > 录屏为纯 CPU 软编码，**不依赖显卡**（无 NVENC 也可运行），适合老机型。

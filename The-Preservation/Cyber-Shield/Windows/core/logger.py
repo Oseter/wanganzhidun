@@ -1,11 +1,20 @@
 """日志模块：分级日志，同时写文件与系统托盘气泡。"""
 import logging
 import os
+import sys
 from datetime import datetime
 
 
-def setup_logger(log_dir: str = "logs", level: int = logging.INFO) -> logging.Logger:
+def _default_log_dir() -> str:
+    """安装/打包后日志写程序目录，开发期写当前目录。"""
+    if getattr(sys, "frozen", False):
+        return os.path.join(os.path.dirname(sys.executable), "logs")
+    return "logs"
+
+
+def setup_logger(log_dir: str = None, level: int = logging.INFO) -> logging.Logger:
     """初始化日志器，输出到 logs/app_YYYYMMDD.log。"""
+    log_dir = log_dir or _default_log_dir()
     os.makedirs(log_dir, exist_ok=True)
     date_str = datetime.now().strftime("%Y%m%d")
     log_path = os.path.join(log_dir, f"app_{date_str}.log")

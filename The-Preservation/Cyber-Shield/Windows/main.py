@@ -30,7 +30,11 @@ from ui.confirm_dialog import ConfirmDialog
 
 class WangAnZhiDun:
     def __init__(self):
-        base = os.path.dirname(os.path.abspath(__file__))
+        # 打包/安装后，所有持久文件落在 exe 同级目录（可写）；开发期落在脚本目录
+        if getattr(sys, "frozen", False):
+            base = os.path.dirname(sys.executable)
+        else:
+            base = os.path.dirname(os.path.abspath(__file__))
         self.cfg = ConfigManager(os.path.join(base, "config.ini"))
         self.db = Database(os.path.join(base, "wanganzhidun.db"))
         self.crypto = EvidenceCrypto(base)
