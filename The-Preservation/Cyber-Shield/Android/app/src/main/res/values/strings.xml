@@ -15,6 +15,7 @@
     <string name="btn_stop_capture">停止录屏</string>
     <string name="btn_open_evidence">证据目录</string>
     <string name="btn_test_forensics">测试取证</string>
+    <string name="no_evidence_yet">暂无证据文件</string>
     <string name="btn_open_settings">关键词设置</string>
 
     <string name="hint_enable_listener">请在「通知使用权」中启用本应用</string>

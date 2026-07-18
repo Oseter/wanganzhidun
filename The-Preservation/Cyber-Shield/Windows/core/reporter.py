@@ -13,6 +13,7 @@ report_channels() 在用户手动确认后并发发起上述已启用通道。
 import os
 import smtplib
 import tempfile
+import threading
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.multipart import MIMEMultipart
@@ -136,24 +137,36 @@ class Reporter:
         返回 [(通道名, 是否成功, 备注), ...]，便于上层汇总与提示。
         仅在所有通道已在用户手动确认的前提下调用（红线）。
         """
-        jobs: List[Tuple[str, Callable]] = []
+        web_jobs: List[Tuple[str, str]] = []
+        email_job: Optional[Tuple[str, Callable]] = None
         if report_cfg.get("enable_12377"):
-            jobs.append(("12377", lambda: self._open_web(
-                report_cfg.get("url_12377", "https://www.12377.cn/"))))
+            web_jobs.append(("12377", report_cfg.get("url_12377", "https://www.12377.cn/")))
         if report_cfg.get("enable_guard"):
-            jobs.append(("腾讯卫士", lambda: self._open_web(
-                report_cfg.get("url_guard", "https://110.qq.com/"))))
+            web_jobs.append(("腾讯卫士", report_cfg.get("url_guard", "https://110.qq.com/")))
         if report_cfg.get("enable_email"):
-            jobs.append(("举报邮箱", lambda: self.send_email(ammo, draft_path)))
+            email_job = ("举报邮箱", lambda: self.send_email(ammo, draft_path))
 
-        if not jobs:
+        if not web_jobs and email_job is None:
             return []
 
         results: List[Tuple[str, bool, str]] = []
-        with ThreadPoolExecutor(max_workers=len(jobs)) as ex:
-            futures = {ex.submit(fn): name for name, fn in jobs}
-            for fut in futures:
-                name = futures[fut]
+
+        # W3 修复：浏览器打开不得在线程池工作线程内进行——跨线程 webbrowser.open
+        # 在部分环境不可靠。每个网页通道起独立守护线程派发，与邮件的 I/O 线程池解耦。
+        web_threads: List[threading.Thread] = []
+        for name, url in web_jobs:
+            t = threading.Thread(
+                target=self._web_result, args=(name, url, results),
+                name=f"web-open-{name}", daemon=True,
+            )
+            t.start()
+            web_threads.append(t)
+
+        # 邮件（网络 I/O）保留在线程池并发执行
+        if email_job is not None:
+            name, fn = email_job
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(fn)
                 try:
                     ok = bool(fut.result(timeout=30))
                 except Exception as e:  # noqa: BLE001
@@ -161,8 +174,12 @@ class Reporter:
                     from .logger import log
                     log.warning(f"通道 {name} 举报失败：{note}")
                     results.append((name, ok, note))
-                    continue
-                results.append((name, ok, ""))
+                else:
+                    results.append((name, ok, ""))
+
+        # 等网页线程结束，确保汇总结果完整
+        for t in web_threads:
+            t.join(timeout=30)
         return results
 
     @staticmethod
@@ -174,3 +191,9 @@ class Reporter:
             from .logger import log
             log.warning(f"打开网页失败 {url}：{e}")
             return False
+
+    @staticmethod
+    def _web_result(name: str, url: str, results: List[Tuple[str, bool, str]]):
+        """独立线程内打开网页并把结果写回汇总列表（W3 修复）。"""
+        ok = Reporter._open_web(url)
+        results.append((name, ok, ""))

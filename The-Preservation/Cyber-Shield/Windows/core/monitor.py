@@ -31,12 +31,16 @@ class NotificationMonitor:
         try:
             from winrt.windows.ui.notifications.management import (
                 UserNotificationListener,
+                NotificationListenerAccessStatus,
             )
             from winrt.windows.ui.notifications import NotificationKinds
             self._listener = UserNotificationListener.current()
-            # 需用户授权；实际弹窗由 UI 层引导
-            acc = self._listener.request_access()
-            if acc != 1:  # Allowed
+            # request_access() 返回 IAsyncOperation（异步），必须等待结果后再判定。
+            # 本方法运行于同步上下文（无事件循环），用 .get() 阻塞等待其完成，
+            # 否则 acc 拿到的只是未完成的异步句柄，acc != 1 判定会失效（W4 修复）。
+            op = self._listener.request_access()
+            status = op.get() if hasattr(op, "get") else op
+            if status != NotificationListenerAccessStatus.ALLOWED:
                 log.warning("通知监听未获授权（需在系统设置中允许）。")
                 return False
 

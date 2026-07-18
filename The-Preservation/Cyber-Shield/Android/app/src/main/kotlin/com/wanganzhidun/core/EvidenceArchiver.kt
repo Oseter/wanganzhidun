@@ -42,6 +42,11 @@ object EvidenceArchiver {
         val clip = File(dir, "clip.mp4")
         if (VideoClipEncoder.encode(frames, clip)) attaches.add(clip.absolutePath)
 
+        // A4 修复：frames 来自 CaptureBuffer.snapshot() 的 24 帧深拷贝，PNG/MP4
+        // 编码均已完成，此处回收副本 Bitmap 释放显存（VideoClipEncoder 内部转
+        // NV21 不回收输入，回收安全）。
+        frames.forEach { it.bitmap.recycle() }
+
         val time = isoFmt.format(Date())
         val ammo = "$target|$time|$content|$clause|${attaches.joinToString(";")}"
         File(dir, "ammo.txt").writeText(ammo)

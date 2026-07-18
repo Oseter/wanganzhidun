@@ -36,7 +36,8 @@ object CaptureOrchestrator {
         val hits = KeywordEngine.match(text)
         if (hits.isEmpty()) return
 
-        val key = (source + text).hashCode().toString()
+        // A6 修复：去重键改用原始内容字符串，避免 hashCode() 碰撞导致漏报真实命中
+        val key = "$source|$text"
         val now = System.currentTimeMillis()
         val last = seen[key] ?: 0
         if (now - last < 30_000) return // 30s 内同内容去重

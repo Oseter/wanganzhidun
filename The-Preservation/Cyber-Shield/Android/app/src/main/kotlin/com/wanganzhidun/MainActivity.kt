@@ -124,18 +124,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openEvidence() {
-        val dir = File(filesDir, Constants.EVIDENCE_DIR)
-        if (!dir.exists()) dir.mkdirs()
-        val target = dir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() } ?: dir
-        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", target)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "*/*")
+        // A5 修复：FileProvider 不能直接分享「目录」，多数文件管理器无法打开目录，
+        // 会走 catch 回退 toast。改为收集最新事件目录内的文件，用 ACTION_SEND_MULTIPLE
+        // 一次性分享多个带 Uri 的文件。
+        val root = File(filesDir, Constants.EVIDENCE_DIR)
+        if (!root.exists()) root.mkdirs()
+        val latestDir = root.listFiles()?.filter { it.isDirectory }
+            ?.maxByOrNull { it.lastModified() } ?: root
+
+        val files = if (latestDir.isDirectory) {
+            latestDir.listFiles()?.toList().orEmpty()
+        } else {
+            listOf(latestDir)
+        }
+        if (files.isEmpty()) {
+            Toast.makeText(this, R.string.no_evidence_yet, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val uris = ArrayList<Uri>()
+        for (f in files) {
+            try {
+                uris.add(FileProvider.getUriForFile(this, "$packageName.fileprovider", f))
+            } catch (_: Exception) {
+                // 跳过无法生成 Uri 的条目
+            }
+        }
+        if (uris.isEmpty()) {
+            Toast.makeText(this, latestDir.absolutePath, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "*/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try {
             startActivity(Intent.createChooser(intent, getString(R.string.btn_open_evidence)))
         } catch (_: Exception) {
-            Toast.makeText(this, dir.absolutePath, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, latestDir.absolutePath, Toast.LENGTH_LONG).show()
         }
     }
 

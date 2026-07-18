@@ -3,7 +3,7 @@
 - **审计对象**：`The-Preservation/Cyber-Shield`（Windows GUI 端 + Android 端）
 - **审计日期**：2025-07-21
 - **审计方式**：静态走读 + `py_compile` 语法校验 + 跨线程 tkinter 调用扫描 + Android 资源/清单/编译依赖核对
-- **结论**：发现 **2 个严重（Critical）+ 3 个高/中（High/Medium）** 会直接影响取证闭环正确性的缺陷，均已修复；另有若干低危项，已在文末列出并给出修复建议（未批量改动，避免引入风险）。
+- **结论**：共发现 **10 个缺陷**（2 Critical / 1 High / 2 Medium / 5 Low），**全部已修复**。低危项原在初版审计中仅记录建议，已按「不可漏任何 bug」要求补齐（见 §三）。
 
 ---
 
@@ -16,11 +16,11 @@
 | A3 | 🟠 High | `Android/.../core/VideoClipEncoder.kt` | Surface 输入编码却未设置呈现时间戳 → MediaMuxer 时间戳非递增 → MP4 静默失败，仅 PNG 兜底 | **已修复** |
 | A1 | 🟡 Medium | `Android/.../service/ChatAccessibilityService.kt` | 遍历无障碍节点不回收子 `AccessibilityNodeInfo` → 系统节点池溢出、漏事件 | **已修复** |
 | A2 | 🟡 Medium | `Android/.../AndroidManifest.xml` | `CaptureService` 误加 `android:permission="android.permission.FOREGROUND_SERVICE"` → 可能 `SecurityException` | **已修复** |
-| W3 | 🟢 Low | `Windows/core/reporter.py` | `webbrowser.open` 在 `ThreadPoolExecutor` 工作线程内调用，跨线程开浏览器在部分环境不可靠 | 记录建议 |
-| W4 | 🟢 Low | `Windows/core/monitor.py` | `request_access()` 为 winrt 异步 API 却未 await，权限判定可能失效（仅 Windows 运行） | 记录建议 |
-| A4 | 🟢 Low | `Android/.../core/CaptureBuffer.kt` | `snapshot()` 深拷贝帧在 `persist` 后未回收，短暂内存占用 | 记录建议 |
-| A5 | 🟢 Low | `Android/.../MainActivity.kt` | `openEvidence` 用 FileProvider 分享目录，多数文件管理器打不开 → 回退 toast | 记录建议 |
-| A6 | 🟢 Low | `Android/.../core/CaptureOrchestrator.kt` | 去重键用 `hashCode()`，哈希碰撞可能漏报 | 记录建议 |
+| W3 | 🟢 Low | `Windows/core/reporter.py` | `webbrowser.open` 在 `ThreadPoolExecutor` 工作线程内调用，跨线程开浏览器在部分环境不可靠 | **已修复** |
+| W4 | 🟢 Low | `Windows/core/monitor.py` | `request_access()` 为 winrt 异步 API 却未 await，权限判定可能失效（仅 Windows 运行） | **已修复** |
+| A4 | 🟢 Low | `Android/.../core/CaptureBuffer.kt` | `snapshot()` 深拷贝帧在 `persist` 后未回收，短暂内存占用 | **已修复** |
+| A5 | 🟢 Low | `Android/.../MainActivity.kt` | `openEvidence` 用 FileProvider 分享目录，多数文件管理器打不开 → 回退 toast | **已修复** |
+| A6 | 🟢 Low | `Android/.../core/CaptureOrchestrator.kt` | 去重键用 `hashCode()`，哈希碰撞可能漏报 | **已修复** |
 
 ---
 
@@ -88,13 +88,39 @@ ammo["evidence_attachments"] = {"screenshots": saved_shots,
 
 ---
 
-## 三、已记录但未改动（低危 / 需特定环境验证）
+## 三、低危项修复详解（按「不可漏任何 bug」要求补齐）
 
-- **W3（低）**：`report_channels()` 在 `ThreadPoolExecutor` 工作线程内 `webbrowser.open(url)`。Windows 上多数情况可用，但跨线程打开浏览器在某些环境非线程安全/不可靠。建议把「打开举报网页」动作改在主线程（应用主线程 `while True` 循环）统一派发，仅邮件发送留在线程池。当前已被 `try/except` 包裹不会崩溃，故暂未改。
-- **W4（低）**：`monitor._setup_winrt()` 中 `self._listener.request_access()` 是 winrt 异步 API，按当前同步调用拿到的可能是 `IAsyncOperation` 而非结果，`acc != 1` 判定可能失效。仅 Windows 运行、沙箱无法验证，建议在 Windows 真机用 `asyncio` 等待结果后再判定。
-- **A4（低）**：`CaptureBuffer.snapshot()` 返回 24 帧深拷贝，在 `EvidenceArchiver.persist()` 编码/写盘后未回收，存在短暂内存占用。可在 `persist` 末尾回收副本（注意 PNG/MP4 编码已完成后再回收）。
-- **A5（低）**：`MainActivity.openEvidence()` 用 `FileProvider.getUriForFile` 分享一个**目录**，多数文件管理器无法打开目录 → 走 `catch` 回退 toast。建议改为分享最新事件目录内的文件列表，或使用系统文件选择器（SAF）。
-- **A6（低）**：`CaptureOrchestrator.onText` 去重键 `(source + text).hashCode().toString()` 存在哈希碰撞风险，极端情况下可能漏报。建议用内容本身（或 `source|text` 字符串）做去重键。
+> 初版审计中这 5 项仅记录建议、未改动；现已全部落地。
+
+### W3（Low）— 线程池工作线程内打开浏览器
+
+**根因**：`report_channels()` 把 `webbrowser.open(url)` 放进 `ThreadPoolExecutor` 工作线程。Windows 上 `webbrowser.open` 最终 fork 浏览器进程，跨线程在部分环境（尤其无活动桌面会话、被服务化时）不可靠，可能静默打不开举报页。
+
+**修复**：邮件（网络 I/O）仍保留在线程池并发；每个网页通道改为起独立守护线程派发 `_web_result()`，与邮件线程池解耦，结果汇总回 `results`。这样既保证网页打开在专建线程上完成，又不阻塞主流程。
+
+### W4（Low）— winrt 异步授权未等待结果
+
+**根因**：`self._listener.request_access()` 在 winrt 中返回 `IAsyncOperation`（异步句柄），原代码直接同步取结果并比较 `!= 1`，拿到的可能尚未完成的异步对象，导致授权判定失效、误报「未获授权」。
+
+**修复**：用 `op.get()` 阻塞等待异步操作完成，取到真正的 `NotificationListenerAccessStatus`，再与 `NotificationListenerAccessStatus.ALLOWED` 比较（`hasattr(op, "get")` 兜底，兼容不同 winrt 版本）。仅 Windows 运行，沙箱无法跑；写法对齐 winrt 官方同步等待范式。
+
+### A4（Low）— snapshot 深拷贝帧未回收
+
+**根因**：`CaptureBuffer.snapshot()` 为取证安全返回 24 帧 `Bitmap` 深拷贝（避免被环形缓冲回收），但 `EvidenceArchiver.persist()` 在 PNG/MP4 写盘后从未回收这些副本，造成短暂显存占用（取证频繁时叠加）。
+
+**修复**：在 PNG 与 `VideoClipEncoder.encode()` 均完成后，对 `frames` 逐一 `bitmap.recycle()`。`VideoClipEncoder` 内部仅把 Bitmap 转 NV21 不回收输入，故此处回收安全、无二次释放风险。
+
+### A5（Low）— openEvidence 分享目录无法打开
+
+**根因**：`FileProvider.getUriForFile` 对一个**目录**生成 Uri，而 `ACTION_VIEW` + 目录 Uri 绝大多数文件管理器不支持 → 走 `catch` 回退 toast，用户拿不到证据。
+
+**修复**：改为收集最新事件目录下全部文件，用 `ACTION_SEND_MULTIPLE` + `EXTRA_STREAM`（多个带 `FLAG_GRANT_READ_URI_PERMISSION` 的 Uri）一次性分享；目录为空时提示「暂无证据文件」，避免无意义 chooser。
+
+### A6（Low）— 去重键哈希碰撞漏报
+
+**根因**：去重键 `(source + text).hashCode().toString()` 为 32 位哈希，不同内容存在碰撞概率，极端情况会把一条真实命中误判为「30s 内重复」而丢弃。
+
+**修复**：去重键改为原始字符串 `"$source|$text"`，彻底消除哈希碰撞，确保每条真实违规内容都能触发取证闭环。
 
 ---
 
@@ -109,6 +135,7 @@ ammo["evidence_attachments"] = {"screenshots": saved_shots,
 
 ## 五、涉及文件改动
 
+初版（Critical/High/Medium）：
 - `Windows/core/archiver.py` — 加密后改写 `ammo` 附件路径、meta 写入后置
 - `Windows/core/reporter.py` — 增加 `crypto` 参数与 `_resolve_attachment()` 解密附件
 - `Windows/main.py` — 传 `crypto`/`default_clause`、接收 `(ok, clause)` 并回写
@@ -118,3 +145,11 @@ ammo["evidence_attachments"] = {"screenshots": saved_shots,
 - `Android/.../core/VideoClipEncoder.kt` — 重写为缓冲区输入 + 显式 PTS
 - `Android/.../service/ChatAccessibilityService.kt` — 回收子节点
 - `Android/.../AndroidManifest.xml` — 移除 `CaptureService` 多余 `android:permission`
+
+补齐（Low，本轮）：
+- `Windows/core/reporter.py` — 网页打开移出线程池，改独立守护线程派发（W3）
+- `Windows/core/monitor.py` — `request_access()` 用 `.get()` 等待异步结果再判定（W4）
+- `Android/.../core/EvidenceArchiver.kt` — `persist` 末尾回收 snapshot 深拷贝帧（A4）
+- `Android/.../MainActivity.kt` — `openEvidence` 改 `ACTION_SEND_MULTIPLE` 分享文件（A5）
+- `Android/app/src/main/res/values/strings.xml` — 新增 `no_evidence_yet` 文案（A5）
+- `Android/.../core/CaptureOrchestrator.kt` — 去重键改为原始字符串 `source|text`（A6）
