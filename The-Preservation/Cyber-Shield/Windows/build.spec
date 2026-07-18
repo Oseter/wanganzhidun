@@ -27,15 +27,17 @@ collected_hiddenimports = [
     "mss",
 ]
 
+# 注意：CI 的 Windows 控制台是 cp1252，print 中文会因 UnicodeEncodeError 直接崩 spec，
+# 所以这里的诊断信息只用 ASCII（源码里的中文注释不会输出，无影响）。
 for _pkg in ("cryptography", "cv2", "numpy"):
     try:
         _bin, _dat, _imp = collect_all(_pkg)
         collected_binaries += _bin
         collected_datas += _dat
         collected_hiddenimports += _imp
-        print(f"[info] collect_all({_pkg}) 成功")
+        print(f"[info] collect_all({_pkg}) OK")
     except Exception as _e:  # noqa: BLE001
-        print(f"[warn] collect_all({_pkg}) 失败：{_e}")
+        print(f"[warn] collect_all({_pkg}) failed: {_e}")
 
 a = Analysis(
     ["main.py"],
