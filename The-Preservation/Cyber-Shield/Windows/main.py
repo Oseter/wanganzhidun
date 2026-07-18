@@ -102,10 +102,22 @@ class WangAnZhiDun:
             )
             if approved:
                 draft = self.reporter.build_draft(ammo)
-                self.reporter.send_email(ammo, draft)
+                report_cfg = self.cfg.report
+                # 复制到剪贴板，便于在各通道粘贴提交（红线：仍由用户手动填写提交）
+                if report_cfg.get("copy_ammo") and self.ui:
+                    try:
+                        with open(draft, "r", encoding="utf-8") as f:
+                            self.ui.copy_text(f.read())
+                    except Exception:
+                        pass
+                # 同谐命途：多入口并发举报（12377 + 腾讯卫士 + 举报邮箱）
+                results = self.reporter.report_channels(ammo, draft, report_cfg)
                 self._c_anti += 1
                 self.ui.set_stats(self._c_forensics, self._c_evidence, self._c_anti)
-                log.info("反伤举报已生成/发送。")
+                summary = "，".join(f"{n}{'✓' if ok else '✗'}" for n, ok, _ in results)
+                log.info(f"反伤并发举报：{summary}")
+                if self.tray:
+                    self.tray.notify("网安智盾 · 反伤", f"已并发发起举报：{summary}")
             else:
                 log.info("用户放弃反伤。")
 

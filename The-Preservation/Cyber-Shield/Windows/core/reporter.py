@@ -1,17 +1,23 @@
 """举报生成模块：把标准弹药整理成可发送的举报草稿。
 
-支持两种输出：
-    1. 本地举报草稿（.txt / .html），用户复制后手动提交官方通道；
-    2. 邮件通道（可选）：通过 SMTP 发送到 jubao@12377.cn 等官方邮箱。
+支持三种官方合规通道（同谐命途·多入口并发）：
+    1. 12377 网信办官网（浏览器打开举报页）；
+    2. 腾讯卫士（浏览器打开举报页）；
+    3. 举报邮箱（可选 SMTP，发往 jubao@12377.cn 等官方地址）。
 
-红线：不伪造证据；只对恶意攻击目标使用；邮件仅发往官方举报地址。
+report_channels() 在用户手动确认后并发发起上述已启用通道。
+
+红线：不伪造证据；只对恶意攻击目标使用；邮件仅发往官方举报地址；
+      绝不自动举报（必须由确认弹窗授权）。
 """
 import os
 import smtplib
+import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-from typing import Dict, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 
 class Reporter:
@@ -81,4 +87,51 @@ class Reporter:
         except Exception as e:
             from .logger import log
             log.warning(f"邮件发送失败：{e}")
+            return False
+
+    # ---------------- 多通道并发举报（同谐命途） ----------------
+    def report_channels(self, ammo: Dict, draft_path: str,
+                        report_cfg: Dict) -> List[Tuple[str, bool, str]]:
+        """按配置并发发起已启用的举报通道。
+
+        返回 [(通道名, 是否成功, 备注), ...]，便于上层汇总与提示。
+        仅在所有通道已在用户手动确认的前提下调用（红线）。
+        """
+        jobs: List[Tuple[str, Callable]] = []
+        if report_cfg.get("enable_12377"):
+            jobs.append(("12377", lambda: self._open_web(
+                report_cfg.get("url_12377", "https://www.12377.cn/"))))
+        if report_cfg.get("enable_guard"):
+            jobs.append(("腾讯卫士", lambda: self._open_web(
+                report_cfg.get("url_guard", "https://110.qq.com/"))))
+        if report_cfg.get("enable_email"):
+            jobs.append(("举报邮箱", lambda: self.send_email(ammo, draft_path)))
+
+        if not jobs:
+            return []
+
+        results: List[Tuple[str, bool, str]] = []
+        with ThreadPoolExecutor(max_workers=len(jobs)) as ex:
+            futures = {ex.submit(fn): name for name, fn in jobs}
+            for fut in futures:
+                name = futures[fut]
+                try:
+                    ok = bool(fut.result(timeout=30))
+                except Exception as e:  # noqa: BLE001
+                    ok, note = False, str(e)
+                    from .logger import log
+                    log.warning(f"通道 {name} 举报失败：{note}")
+                    results.append((name, ok, note))
+                    continue
+                results.append((name, ok, ""))
+        return results
+
+    @staticmethod
+    def _open_web(url: str) -> bool:
+        """用默认浏览器打开官方举报页（仅官方合规地址）。"""
+        try:
+            return bool(webbrowser.open(url))
+        except Exception as e:  # noqa: BLE001
+            from .logger import log
+            log.warning(f"打开网页失败 {url}：{e}")
             return False

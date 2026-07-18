@@ -123,6 +123,18 @@ class ConfigManager:
             ),
         }
 
+    # ---------- 多通道并发举报（同谐命途） ----------
+    @property
+    def report(self) -> dict:
+        return {
+            "enable_12377": self.get_bool("report", "enable_12377", True),
+            "enable_guard": self.get_bool("report", "enable_guard", True),
+            "enable_email": self.get_bool("report", "enable_email", True),
+            "url_12377": self.get("report", "url_12377", "https://www.12377.cn/"),
+            "url_guard": self.get("report", "url_guard", "https://110.qq.com/"),
+            "copy_ammo": self.get_bool("report", "copy_ammo", True),
+        }
+
     @property
     def default_clause(self) -> str:
         return self.get(

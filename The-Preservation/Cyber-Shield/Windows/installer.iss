@@ -1,7 +1,7 @@
 ; 网安智盾 安装包脚本 (Inno Setup 6)
 ; CI 在 Windows runner 上用 iscc 编译，产出 WangAnZhiDun-Setup.exe
 #define MyAppName "网安智盾 WangAnZhiDun"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.2.1"
 #define MyAppPublisher "民用武器体系"
 #define MyAppURL "https://github.com/Oseter/wanganzhidun"
 #define MyExe "WangAnZhiDun.exe"

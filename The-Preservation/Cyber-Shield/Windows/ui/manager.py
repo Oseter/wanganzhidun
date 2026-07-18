@@ -149,6 +149,11 @@ class UIManager:
     def set_stats(self, forensics: int, evidence: int, anti: int):
         self._dispatch(lambda: self._main.set_stats(forensics, evidence, anti))
 
+    def copy_text(self, text: str):
+        """把文本复制到系统剪贴板（在 UI 线程执行，线程安全）。"""
+        self._dispatch(lambda: (self.root.clipboard_clear(),
+                                self.root.clipboard_append(text)))
+
     # ---------------- 配置窗（非阻塞） ----------------
     def open_config(self, config, on_applied: Callable = None):
         from ui.config_window import ConfigWindow
