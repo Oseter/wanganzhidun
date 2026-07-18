@@ -35,7 +35,7 @@
 | Windows | `The-Preservation/Cyber-Shield/Windows` | **开发中（架构完成）** | `WangAnZhiDun.exe` |
 | Chrome 扩展 | `The-Preservation/Cyber-Shield/Chrome-Extension` | 规划 | `wang-an-zhi-dun.crx` |
 | Android | `The-Preservation/Cyber-Shield/Android` | 规划 | `WangAnZhiDun.apk` |
-| 文档 | `The-Preservation/Cyber-Shield/Docs` | 规划 | 技术白皮书 / 使用说明书 |
+| 文档 | [`The-Preservation/Cyber-Shield/Docs`](The-Preservation/Cyber-Shield/Docs) | **白皮书已入库** | [CICCS 技术白皮书](The-Preservation/Cyber-Shield/Docs/CICCS技术白皮书.md) / 使用说明书（规划） |
 
 ### Windows 版（当前重点）
 
