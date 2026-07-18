@@ -34,7 +34,7 @@
 |------|------|------|--------|
 | Windows | `The-Preservation/Cyber-Shield/Windows` | **开发中（架构完成）** | `WangAnZhiDun.exe` |
 | Chrome 扩展 | `The-Preservation/Cyber-Shield/Chrome-Extension` | 规划 | `wang-an-zhi-dun.crx` |
-| Android | `The-Preservation/Cyber-Shield/Android` | 规划 | `WangAnZhiDun.apk` |
+| Android | `The-Preservation/Cyber-Shield/Android` | **开发中（架构完成）** | `WangAnZhiDun.apk` |
 | 文档 | [`The-Preservation/Cyber-Shield/Docs`](The-Preservation/Cyber-Shield/Docs) | **白皮书已入库** | [CICCS 技术白皮书](The-Preservation/Cyber-Shield/Docs/CICCS技术白皮书.md) / 使用说明书（规划） |
 
 ### Windows 版（当前重点）
@@ -64,6 +64,22 @@
 | `WangAnZhiDun.exe` | 单文件便携版：解压即用，常驻系统托盘 |
 
 > 注：安装包与便携版二进制一致，差异仅在安装/卸载流程。首次运行需在系统设置中允许「通知访问」权限，工具才能读取 QQ/微信 通知栏。
+
+Android 端 APK 由 `.github/workflows/android.yml` 自动构建，产物 `WangAnZhiDun-apk`（release 包）可在对应 Actions 运行的 Artifacts 中下载。
+
+### Android 版（同存护命途，移动端取证）
+
+原生 Kotlin 实现，技术栈：Gradle Kotlin DSL + AGP 8.5 + Kotlin 1.9 + KSP + Room + MediaProjection。
+与 Windows 版同源的"取证—标准弹药—手动确认反伤"闭环，移动端专项能力：
+
+- **通知监听服务**（`NotificationListenerService`）：捕获目标账号推送正文；
+- **聊天无障碍服务**（`ChatAccessibilityService`）：读取对话界面文本，喂给关键词论引擎；
+- **循环缓冲录屏**（`CaptureService` + `MediaProjection`）：**无需 OBS**，持续抓帧写入 `CaptureBuffer` 环形缓冲，取证触发时回捞最近 N 帧，归档为标准弹药（PNG + 尽力生成 MP4 短视频）；
+- **关键词论引擎**（`KeywordEngine`）：从 `keywords.json` 加载用户词表，仅本地做包含匹配；
+- **反伤手动确认**（`ReportDispatchActivity`）：命中后仅弹"确认举报"通知，用户点击才跳转 12377 / 腾讯卫士官方通道——程序不自动举报（红线）。
+
+> 构建：Android 工程用 Android Studio 打开 `The-Preservation/Cyber-Shield/Android` 即可运行（首次会补全 Gradle Wrapper）。
+> 亦可等待 GitHub Actions 自动产出 `WangAnZhiDun.apk` 构建产物。
 
 ---
 
