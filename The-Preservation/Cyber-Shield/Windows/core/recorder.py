@@ -113,6 +113,29 @@ class ScreenRecorder:
             log.warning(f"JPEG 序列保存也失败：{e}")
             return None
 
+    def reconfigure(self, fps: int = None, buffer_seconds: int = None,
+                    scale: float = None, monitor_index: int = None,
+                    enabled: bool = None):
+        """热更新录屏参数（配置窗保存后调用，无需重启）。"""
+        if fps is not None:
+            self.fps = fps
+            self._frame_interval = 1.0 / max(1, fps)
+        if buffer_seconds is not None:
+            self.buffer_seconds = buffer_seconds
+        if scale is not None:
+            self.scale = scale
+        if monitor_index is not None:
+            self.monitor_index = monitor_index
+        if enabled is not None:
+            self.enabled = enabled
+        # 缓冲区容量随 fps/时长变化
+        self.max_frames = max(1, int(self.fps * self.buffer_seconds))
+        # 若开启录屏但当前未运行，则启动
+        if self.enabled and not self._running:
+            self.start()
+        elif not self.enabled and self._running:
+            self.stop()
+
     def stop(self):
         self._running = False
         if self._thread:

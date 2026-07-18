@@ -2,6 +2,7 @@
 
 装配流程：
     加载配置 → 初始化数据库/加密/监听/录屏/归档/举报 →
+    启动 UI 管理器（主窗口 + 配置窗 + 确认弹窗，统一 Tk 根）→
     启动托盘 → 进入监听循环（命中关键词 → 截图+录像 → 归档标准弹药 →
     记录 SQLite → 反伤确认弹窗 → 生成举报草稿/邮件）
 
@@ -23,9 +24,8 @@ from core.recorder import ScreenRecorder
 from core.archiver import Archiver
 from core.reporter import Reporter
 from db.database import Database
+from ui.manager import UIManager
 from ui.tray import TrayApp
-from ui.config_window import ConfigWindow
-from ui.confirm_dialog import ConfirmDialog
 
 
 class WangAnZhiDun:
@@ -35,6 +35,7 @@ class WangAnZhiDun:
             base = os.path.dirname(sys.executable)
         else:
             base = os.path.dirname(os.path.abspath(__file__))
+        self.base = base
         self.cfg = ConfigManager(os.path.join(base, "config.ini"))
         self.db = Database(os.path.join(base, "wanganzhidun.db"))
         self.crypto = EvidenceCrypto(base)
@@ -51,8 +52,14 @@ class WangAnZhiDun:
 
         self.monitor = None
         self.tray = None
+        self.ui = None
         self._last_trigger = 0
         self._paused = False
+
+        # 本会话统计
+        self._c_forensics = 0
+        self._c_evidence = 0
+        self._c_anti = 0
 
     # ---------- 核心：命中处理 ----------
     def _on_trigger(self, app: str, text: str, ts: float):
@@ -80,15 +87,24 @@ class WangAnZhiDun:
         event_id = self.db.add_event(app, self.kw.match(text) or "命中", self.cfg.save_path)
         self.db.add_evidence(event_id, ammo)
 
+        # 统计 + UI 刷新
+        self._c_forensics += 1
+        self._c_evidence += len(shots) + (1 if replay else 0)
+        self.ui.add_event(datetime.now().strftime("%H:%M:%S"), app,
+                          self.kw.match(text) or "命中")
+        self.ui.set_stats(self._c_forensics, self._c_evidence, self._c_anti)
+
         # 反伤判定
         anti = self.cfg.anti_strike
         if anti["enabled"] and self.kw.is_attack(text):
-            approved = ConfirmDialog.ask(
+            approved = self.ui.ask_confirm(
                 app, text, self.cfg.default_clause, anti["confirm_timeout"]
             )
             if approved:
                 draft = self.reporter.build_draft(ammo)
                 self.reporter.send_email(ammo, draft)
+                self._c_anti += 1
+                self.ui.set_stats(self._c_forensics, self._c_evidence, self._c_anti)
                 log.info("反伤举报已生成/发送。")
             else:
                 log.info("用户放弃反伤。")
@@ -96,34 +112,112 @@ class WangAnZhiDun:
         if self.tray:
             self.tray.notify("网安智盾", f"已取证：{app}")
 
+    # ---------- 配置热更新 ----------
+    def _apply_config(self, config):
+        """配置窗保存后调用，热更新各模块，无需重启。"""
+        self.kw.reload(config.keywords)
+
+        rec = config.recorder
+        self.recorder.reconfigure(
+            enabled=rec["enabled"], fps=rec["fps"],
+            buffer_seconds=rec["buffer_seconds"],
+            scale=rec["scale"], monitor_index=rec["monitor_index"],
+        )
+
+        self.screenshotter.save_dir = config.save_path
+        self.screenshotter.fmt = config.screenshot_format.lower()
+        self.screenshotter.max_count = config.max_screenshots
+
+        self.archiver.root = config.save_path
+        self.archiver.encrypt = config.encrypt
+        self.archiver.default_clause = config.default_clause
+
+        self.reporter.email_cfg = config.email
+
+        if self.ui:
+            self.ui.set_rec_enabled(rec["enabled"])
+        log.info("配置已热更新。")
+
+    # ---------- 交互动作 ----------
+    def _toggle_monitor(self):
+        self._paused = not self._paused
+        if self.monitor:
+            if self._paused:
+                self.monitor.stop()
+            else:
+                self.monitor.start()
+        running = not self._paused
+        if self.ui:
+            self.ui.set_running(running)
+        if self.tray:
+            self.tray.set_running(running)
+        log.info("监听已" + ("恢复" if running else "暂停"))
+
+    def _open_evidence(self):
+        path = self.cfg.save_path
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(path)
+            else:
+                os.system(f'xdg-open "{path}"')
+        except Exception as e:
+            log.warning(f"打开证据目录失败：{e}")
+
+    def _hide_ui(self):
+        if self.ui:
+            self.ui.hide()
+
+    def _test_trigger(self):
+        """模拟一次取证，验证截图/录屏/归档链路（不触发反伤确认）。"""
+        def _run():
+            self._on_trigger(
+                "测试",
+                "测试：这是一条模拟的普通通知，用于验证取证链路（截图/录屏/归档）。",
+                time.time(),
+            )
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _refresh_state(self):
+        return (
+            self.db.recent_events(50),
+            (self._c_forensics, self._c_evidence, self._c_anti),
+        )
+
     # ---------- 生命周期 ----------
     def start(self):
+        # UI 管理器（统一 Tk 根，独立 UI 线程）先建实例，避免监听线程
+        # 在 UI 就绪前触发时 self.ui 为 None
+        self.ui = UIManager({
+            "on_settings": lambda: self.ui.open_config(self.cfg, self._apply_config),
+            "on_open_evidence": self._open_evidence,
+            "on_toggle": self._toggle_monitor,
+            "on_test": self._test_trigger,
+            "on_quit": self.stop,
+            "on_close": self._hide_ui,
+            "on_refresh": self._refresh_state,
+        })
+
         # 启动自带循环缓冲录屏（不依赖任何外部应用）
         self.recorder.start()
 
         self.monitor = NotificationMonitor(self.kw, self._on_trigger)
         self.monitor.start()
 
+        self.ui.start()
+        self.ui.set_rec_enabled(self.cfg.recorder["enabled"])
+        self.ui.set_stats(self._c_forensics, self._c_evidence, self._c_anti)
+
+        # 系统托盘
         self.tray = TrayApp(
-            self.cfg.save_path,
-            on_settings=self._open_settings,
-            on_toggle=self._toggle,
+            evidence_dir=self.cfg.save_path,
+            ui=self.ui,
+            on_settings=lambda: self.ui.open_config(self.cfg, self._apply_config),
+            on_open_evidence=self._open_evidence,
+            on_toggle=self._toggle_monitor,
             on_quit=self.stop,
         )
         self.tray.start()
         log.info("网安智盾已启动。")
-
-    def _open_settings(self):
-        ConfigWindow(self.cfg).run()
-
-    def _toggle(self, running: bool):
-        self._paused = not running
-        if self.monitor:
-            if running:
-                self.monitor.start()
-            else:
-                self.monitor.stop()
-        log.info("监听已" + ("恢复" if running else "暂停"))
 
     def stop(self):
         if self.monitor:

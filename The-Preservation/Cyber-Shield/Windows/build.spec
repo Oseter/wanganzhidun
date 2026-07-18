@@ -22,8 +22,18 @@ collected_hiddenimports = [
     # winrt 通知监听（monitor.py 实际导入路径）
     "winrt.windows.ui.notifications.management",
     "winrt.windows.ui.notifications",
-    # 其他纯 Python 依赖
+    # 系统托盘
     "pystray",
+    # tkinter GUI（主窗口/配置窗/确认弹窗）
+    "tkinter",
+    "tkinter.ttk",
+    "tkinter.filedialog",
+    "tkinter.messagebox",
+    "tkinter.simpledialog",
+    # 图标绘制
+    "PIL",
+    "PIL.ImageTk",
+    "PIL.ImageDraw",
     "mss",
 ]
 
