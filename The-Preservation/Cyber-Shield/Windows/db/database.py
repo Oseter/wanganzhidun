@@ -79,6 +79,14 @@ class Database:
         )
         self._conn.commit()
 
+    def update_evidence_clause(self, event_id: int, clause: str):
+        cur = self._conn.cursor()
+        cur.execute(
+            "UPDATE evidence SET clause = ? WHERE event_id = ?",
+            (clause, event_id),
+        )
+        self._conn.commit()
+
     def log_config(self, snapshot: str):
         cur = self._conn.cursor()
         cur.execute(

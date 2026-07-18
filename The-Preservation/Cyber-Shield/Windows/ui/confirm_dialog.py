@@ -90,4 +90,4 @@ class ConfirmDialog:
         except Exception:
             pass
         if callable(self.on_result):
-            self.on_result(value)
+            self.on_result(value, self.clause_var.get())

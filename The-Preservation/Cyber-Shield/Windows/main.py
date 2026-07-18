@@ -48,7 +48,7 @@ class WangAnZhiDun:
         self.archiver = Archiver(
             self.cfg.save_path, self.cfg.encrypt, self.crypto, self.cfg.default_clause
         )
-        self.reporter = Reporter(self.cfg.email, os.path.join(base, "reports"))
+        self.reporter = Reporter(self.cfg.email, os.path.join(base, "reports"), self.crypto)
 
         self.monitor = None
         self.tray = None
@@ -82,8 +82,10 @@ class WangAnZhiDun:
             replay_path = os.path.join(self.cfg.save_path, f"replay_{ts_str}.mp4")
             replay = self.recorder.save_buffer(replay_path)
 
-        # 归档为标准弹药
-        ammo = self.archiver.archive(app, text, shots, replay)
+        # 归档为标准弹药（写入默认条款，保证标准弹药「对应条款」字段非空）
+        ammo = self.archiver.archive(
+            app, text, shots, replay, clause=self.cfg.default_clause
+        )
         event_id = self.db.add_event(app, self.kw.match(text) or "命中", self.cfg.save_path)
         self.db.add_evidence(event_id, ammo)
 
@@ -97,10 +99,13 @@ class WangAnZhiDun:
         # 反伤判定
         anti = self.cfg.anti_strike
         if anti["enabled"] and self.kw.is_attack(text):
-            approved = self.ui.ask_confirm(
+            approved, clause = self.ui.ask_confirm(
                 app, text, self.cfg.default_clause, anti["confirm_timeout"]
             )
             if approved:
+                # 用户在确认弹窗中可能修改了条款，写回标准弹药与草稿/邮件
+                ammo["clause"] = clause
+                self.db.update_evidence_clause(event_id, clause)
                 draft = self.reporter.build_draft(ammo)
                 report_cfg = self.cfg.report
                 # 复制到剪贴板，便于在各通道粘贴提交（红线：仍由用户手动填写提交）

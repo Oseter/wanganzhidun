@@ -12,6 +12,7 @@ report_channels() 在用户手动确认后并发发起上述已启用通道。
 """
 import os
 import smtplib
+import tempfile
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from email.mime.multipart import MIMEMultipart
@@ -23,9 +24,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 class Reporter:
     """举报草稿生成与发送。"""
 
-    def __init__(self, email_cfg: Dict, save_dir: str):
+    def __init__(self, email_cfg: Dict, save_dir: str, crypto=None):
         self.email_cfg = email_cfg
         self.save_dir = save_dir
+        self.crypto = crypto
         os.makedirs(save_dir, exist_ok=True)
 
     def build_draft(self, ammo: Dict) -> str:
@@ -68,10 +70,16 @@ class Reporter:
             with open(draft_path, "r", encoding="utf-8") as f:
                 body = f.read()
             msg.attach(MIMEText(body, "plain", "utf-8"))
-            # 附件：截图（仅原始未加密副本，若存在）
+            # 附件：截图。证据默认加密存储（.enc），发往官方邮箱前需先解密到
+            # 临时文件；若加密关闭则为明文，直接附加。解密出的临时文件发送后清理。
             att = ammo.get("evidence_attachments", {})
-            for s in att.get("screenshots", []):
-                if os.path.exists(s):
+            tmp_attachments = []
+            try:
+                for s in att.get("screenshots", []):
+                    plain = self._resolve_attachment(s)
+                    if plain:
+                        tmp_attachments.append(plain)
+                for s in tmp_attachments:
                     with open(s, "rb") as fp:
                         part = MIMEApplication(fp.read())
                         part.add_header(
@@ -79,6 +87,14 @@ class Reporter:
                             filename=os.path.basename(s),
                         )
                         msg.attach(part)
+            finally:
+                temp_dir = (tempfile.gettempdir() or "").rstrip(os.sep)
+                for t in tmp_attachments:
+                    if temp_dir and t.startswith(temp_dir):
+                        try:
+                            os.remove(t)
+                        except OSError:
+                            pass
             with smtplib.SMTP(cfg["smtp_server"], cfg["smtp_port"]) as server:
                 server.starttls()
                 server.login(cfg["sender"], cfg["sender_password"])
@@ -88,6 +104,29 @@ class Reporter:
             from .logger import log
             log.warning(f"邮件发送失败：{e}")
             return False
+
+    def _resolve_attachment(self, path: str):
+        """返回可直接附邮件的文件路径：明文直接返回；加密 .enc 则解密到临时文件。
+
+        证据默认以 .enc 落盘（加密存储），邮件必须发真实证据，故先解密。
+        解密出的临时文件由调用方发送后清理。
+        """
+        if os.path.exists(path):
+            return path
+        enc = path if path.endswith(".enc") else path + ".enc"
+        if os.path.exists(enc) and self.crypto is not None:
+            try:
+                suffix = ".png" if "shot" in os.path.basename(path) else (
+                    os.path.splitext(path)[1] or ".bin"
+                )
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                tmp.close()
+                self.crypto.decrypt_file(enc, tmp.name)
+                return tmp.name
+            except Exception as e:
+                from .logger import log
+                log.warning(f"解密证据附件失败 {enc}：{e}")
+        return None
 
     # ---------------- 多通道并发举报（同谐命途） ----------------
     def report_channels(self, ammo: Dict, draft_path: str,

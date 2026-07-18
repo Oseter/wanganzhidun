@@ -29,10 +29,18 @@ class ChatAccessibilityService : AccessibilityService() {
 
     private fun traverse(node: AccessibilityNodeInfo?, sb: StringBuilder) {
         node ?: return
-        node.text?.let { sb.append(it).append(' ') }
-        val count = node.childCount
-        for (i in 0 until count) {
-            traverse(node.getChild(i), sb)
+        try {
+            node.text?.let { sb.append(it).append(' ') }
+            val count = node.childCount
+            for (i in 0 until count) {
+                // getChild 返回的是新节点，必须在使用后回收，否则会耗尽系统节点池
+                // （Android 会报 "AccessibilityNodeInfo cache overflow" 并漏掉后续事件）
+                val child = node.getChild(i) ?: continue
+                traverse(child, sb)
+                child.recycle()
+            }
+        } finally {
+            // 根节点由 onAccessibilityEvent 的 finally 回收，这里不回收
         }
     }
 

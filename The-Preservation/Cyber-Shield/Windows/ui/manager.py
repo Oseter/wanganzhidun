@@ -182,11 +182,12 @@ class UIManager:
         """
         from ui.confirm_dialog import ConfirmDialog
 
-        result = {"ok": False}
+        result = {"ok": False, "clause": clause}
         done = threading.Event()
 
-        def on_result(value: bool):
+        def on_result(value: bool, clause_text: str = clause):
             result["ok"] = value
+            result["clause"] = clause_text
             done.set()
 
         def build():
@@ -200,4 +201,4 @@ class UIManager:
         else:
             self._dispatch(build)
         done.wait()
-        return result["ok"]
+        return result["ok"], result["clause"]

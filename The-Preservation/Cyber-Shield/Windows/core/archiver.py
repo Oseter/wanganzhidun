@@ -60,7 +60,7 @@ class Archiver:
         with open(raw_path, "w", encoding="utf-8") as f:
             f.write(text)
 
-        # 标准弹药元数据
+        # 标准弹药元数据（附件路径先指向明文文件）
         ammo = {
             "target_account": target_account,       # 目标账号
             "time": ts.isoformat(),                 # 时间
@@ -73,28 +73,39 @@ class Archiver:
             },
             "source_app": app,
         }
-        meta_path = os.path.join(event_dir, "meta.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(ammo, f, ensure_ascii=False, indent=2)
 
-        # 本地加密（可选）
+        # 本地加密（可选）：加密后会删除明文原件，因此必须同步把 ammo 中的
+        # 附件路径改写为加密后的 .enc 路径，保证 db / 草稿 / 邮件引用始终有效。
+        # 否则 send_email 会因明文已删除而静默丢弃全部附件（历史 bug）。
         if self.encrypt and self.crypto:
-            to_encrypt = list(saved_shots) + [raw_path, meta_path]
-            # 录像为文件则加密；为目录则加密其中每个 jpg
-            if saved_replay:
-                if os.path.isdir(saved_replay):
-                    for root, _, files in os.walk(saved_replay):
-                        for fn in files:
-                            to_encrypt.append(os.path.join(root, fn))
-                else:
-                    to_encrypt.append(saved_replay)
-            for p in to_encrypt:
+            def _enc(p):
                 if os.path.exists(p) and not p.endswith(".enc"):
                     try:
                         self.crypto.encrypt_file(p)
                         os.remove(p)
+                        return p + ".enc"
                     except Exception as e:
                         from .logger import log
                         log.warning(f"加密失败 {p}: {e}")
+                return p
+            saved_shots = [_enc(p) for p in saved_shots]
+            raw_path = _enc(raw_path)
+            if saved_replay:
+                if os.path.isdir(saved_replay):
+                    for r, _, files in os.walk(saved_replay):
+                        for fn in files:
+                            _enc(os.path.join(r, fn))
+                else:
+                    saved_replay = _enc(saved_replay)
+            ammo["evidence_attachments"] = {
+                "screenshots": saved_shots,
+                "replay": saved_replay,
+                "raw_text": raw_path,
+            }
+
+        # 落盘标准弹药元数据（必须写在所有加密改写完成之后，保证 meta 与 ammo 一致）
+        meta_path = os.path.join(event_dir, "meta.json")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(ammo, f, ensure_ascii=False, indent=2)
 
         return ammo
