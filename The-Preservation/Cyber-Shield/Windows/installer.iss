@@ -47,8 +47,8 @@ SetupLogging=yes
 Name: "ChineseSimplified"; MessagesFile: "compiler:ChineseSimplified.isl"
 
 [Files]
-; PyInstaller 产出 + 配置文件，一起装到程序目录
-Source: "dist\{#MyExe}"; DestDir: "{app}"; Flags: ignoreversion
+; PyInstaller 产出（onedir：dist\WangAnZhiDun\ 目录）+ 配置文件，一起装到程序目录
+Source: "dist\{#MyExe}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "config.ini"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

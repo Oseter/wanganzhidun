@@ -31,6 +31,20 @@ jobs:
         working-directory: The-Preservation/Cyber-Shield/Windows
         run: pyinstaller build.spec
 
+      - name: Sign exe (Authenticode)
+        if: ${{ secrets.WIN_CERT_PFX != '' }}
+        working-directory: The-Preservation/Cyber-Shield/Windows
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.WIN_CERT_PFX }}
+          PFX_PWD: ${{ secrets.WIN_CERT_PWD }}
+        run: .\sign_windows.ps1
+
+      - name: Package portable (onedir zip)
+        working-directory: The-Preservation/Cyber-Shield/Windows
+        shell: pwsh
+        run: Compress-Archive -Path dist\WangAnZhiDun -DestinationPath WangAnZhiDun-portable.zip -Force
+
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
@@ -43,11 +57,11 @@ jobs:
           if (-not $iscc) { throw "ISCC.exe not found" }
           & $iscc.FullName installer.iss
 
-      - name: Upload exe artifact
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WangAnZhiDun.exe
-          path: The-Preservation/Cyber-Shield/Windows/dist/WangAnZhiDun.exe
+          name: WangAnZhiDun-portable
+          path: The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
@@ -64,10 +78,12 @@ jobs:
           body: |
             网安智盾 WangAnZhiDun 自动构建（Windows 64位）。
             - WangAnZhiDun-Setup.exe：安装包（推荐，含开始菜单/桌面快捷方式/卸载）
-            - WangAnZhiDun.exe：单文件便携版
+            - WangAnZhiDun-portable.zip：免安装目录版（解压即用，运行时不再 temp 解包）
             常驻系统托盘，监听 QQ/微信 通知栏，关键词触发截图+自带录屏+证据归档。
+            已关闭 UPX、嵌入 asInvoker 清单与版本信息以降低误报；如仍有 SmartScreen
+            拦截，请见仓库 AV_误报处置 说明（需代码签名证书，CI 已接好签名步骤）。
           files: |
-            The-Preservation/Cyber-Shield/Windows/dist/WangAnZhiDun.exe
+            The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
             The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

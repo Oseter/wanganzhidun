@@ -245,6 +245,36 @@ class WangAnZhiDun:
         os._exit(0)
 
 
+def _fatal_error(e: Exception):
+    """冻结版（无控制台）启动致命错误：写崩溃日志 + 弹窗，避免「无界面假死」。"""
+    import os
+    import traceback
+    from datetime import datetime
+    tb = traceback.format_exc()
+    try:
+        base = os.path.dirname(os.path.abspath(sys.argv[0]))
+    except Exception:
+        base = "."
+    try:
+        with open(os.path.join(base, "wangzhidun_crash.log"),
+                  "a", encoding="utf-8") as f:
+            f.write(f"\n[{datetime.now()}] 致命错误:\n{tb}\n")
+    except Exception:
+        pass
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror(
+            "网安智盾 · 启动失败",
+            f"程序无法启动：\n{e}\n\n详情见 wangzhidun_crash.log",
+        )
+        r.destroy()
+    except Exception:
+        pass
+
+
 def main():
     # 开机自启：安装向导写入的 Run 项带 --minimized，启动即最小化到托盘
     start_minimized = any(
@@ -253,6 +283,11 @@ def main():
     app = WangAnZhiDun()
     try:
         app.start(start_minimized=start_minimized)
+    except Exception as e:  # noqa: BLE001
+        # UI 初始化等启动期异常：弹窗暴露原因后退出，而非静默常驻
+        _fatal_error(e)
+        return
+    try:
         # 保持主线程存活
         while True:
             time.sleep(1)

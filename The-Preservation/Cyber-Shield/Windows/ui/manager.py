@@ -40,6 +40,7 @@ class UIManager:
         self._config_dlg = None
         self._running = True
         self._start_minimized = start_minimized
+        self._startup_error = None  # UI 线程启动异常时记录 traceback
         # 跨线程安全投递队列：所有 UI 操作都进这里，由 UI 线程泵取出执行
         self._queue: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
@@ -49,30 +50,73 @@ class UIManager:
         self._ui_thread.start()
         # 等根窗口就绪，保证后续调用 root 非 None
         self._ready.wait(timeout=10)
+        # UI 线程若启动失败，把异常抛回主线程，由 main() 弹窗并退出，
+        # 而不是让进程「无界面」地静默常驻。
+        if getattr(self, "_startup_error", None):
+            raise RuntimeError(f"UI 初始化失败：\n{self._startup_error}")
 
     def _run(self):
         from PIL import ImageTk
         from ui.main_window import MainWindow
         from ui.icons import window_logo
 
-        self.root = tk.Tk()
-        pil = window_logo(40)
         try:
-            self.logo = ImageTk.PhotoImage(pil)
-        except Exception:
-            self.logo = None
-
-        self._main = MainWindow(self.root, {**self.cb, "logo": self.logo})
-        self._ready.set()
-        # 开机自启场景：启动即隐藏到托盘，仅留系统托盘常驻
-        if self._start_minimized:
+            self.root = tk.Tk()
+            self.root.title("网安智盾 · WangAnZhiDun")
+            pil = window_logo(40)
             try:
-                self.root.withdraw()
+                self.logo = ImageTk.PhotoImage(pil)
+            except Exception:
+                self.logo = None
+
+            self._main = MainWindow(self.root, {**self.cb, "logo": self.logo})
+            self._ready.set()
+
+            # 正常启动：无论是否开机自启，先把窗口顶到前台显示一次，
+            # 避免「进程在跑、窗口却没弹出来」的假象（exe 无控制台，崩溃会被吞）。
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.attributes("-topmost", True)
+                self.root.after(200, lambda: self.root.attributes("-topmost", False))
             except Exception:
                 pass
-        # 启动队列泵（root.after 仅在 UI 线程内调用，安全）
-        self.root.after(self.POLL_MS, self._pump)
-        self.root.mainloop()
+
+            # 仅当明确开机自启时才收起（仅留托盘）；否则保持可见
+            if self._start_minimized:
+                try:
+                    self.root.withdraw()
+                except Exception:
+                    pass
+
+            # 启动队列泵（root.after 仅在 UI 线程内调用，安全）
+            self.root.after(self.POLL_MS, self._pump)
+            self.root.mainloop()
+        except Exception as e:  # noqa: BLE001
+            # UI 线程任何异常都不再静默吞掉：写崩溃日志 + 把异常交给主线程弹窗
+            import os
+            import sys
+            import traceback
+            from datetime import datetime
+            tb = traceback.format_exc()
+            self._startup_error = tb
+            try:
+                from core.logger import log
+                log.error(f"UI 线程启动失败：\n{tb}")
+            except Exception:
+                pass
+            # 崩溃日志写到 exe 同目录，便于排查「窗口没弹出」的真实原因
+            try:
+                base = os.path.dirname(os.path.abspath(sys.argv[0]))
+            except Exception:
+                base = "."
+            try:
+                with open(os.path.join(base, "wangzhidun_crash.log"),
+                          "a", encoding="utf-8") as f:
+                    f.write(f"\n[{datetime.now()}] UI 启动失败:\n{tb}\n")
+            except Exception:
+                pass
+            self._ready.set()  # 解除 start() 的等待，让主线程去弹错误
 
     # ---------------- UI 线程泵（只在 UI 线程内运行） ----------------
     def _pump(self):
