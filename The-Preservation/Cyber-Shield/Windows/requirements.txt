@@ -16,8 +16,8 @@ numpy==1.26.4
 
 # Windows 通知监听（QQ/微信通知中心）
 # 仅 Windows 生效；非 Windows 环境自动降级为轮询模式
+# 注：winsdk 包在 PyPI 仅有 1.0.0b* 测试版，且 winrt 自带运行时，无需单独装
 winrt-Windows.UI.Notifications==2.0.1
-winsdk==0.8.1
 
 # 本地证据加密（AES / Fernet）
 cryptography==43.0.0
