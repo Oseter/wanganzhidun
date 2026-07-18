@@ -33,6 +33,14 @@ a = Analysis(
     noarchive=False,
 )
 
+# 强制收集含原生扩展的包（否则运行期 ModuleNotFoundError）
+# cryptography 的 _rust 编译模块、cv2/numpy 的二进制扩展都必须整包收集
+for _pkg in ("cryptography", "cv2", "numpy"):
+    try:
+        a.collect_all(_pkg)
+    except Exception as _e:
+        print(f"[warn] collect_all({_pkg}) 失败：{_e}")
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
