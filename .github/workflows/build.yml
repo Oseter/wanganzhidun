@@ -52,12 +52,19 @@ jobs:
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         run: |
+          Write-Host "Checking files..."
+          Get-ChildItem installer\ | ForEach-Object { Write-Host "  $($_.Name)" }
+          Get-ChildItem resources\ | ForEach-Object { Write-Host "  $($_.Name)" }
+          Write-Host "dist\WangAnZhiDun exists: $(Test-Path dist\WangAnZhiDun)"
+          Write-Host "config.ini exists: $(Test-Path config.ini)"
           $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
           if (-not $iscc) { $iscc = Get-Command iscc -ErrorAction SilentlyContinue }
           if (-not $iscc) { throw "ISCC.exe not found" }
-          Write-Host "Using ISCC: $($iscc.FullName)"
+          Write-Host "ISCC: $($iscc.FullName)"
           & $iscc.FullName installer.iss 2>&1 | ForEach-Object { Write-Host $_ }
-          if (-not (Test-Path installer\WangAnZhiDun-Setup.exe)) { throw "installer output not found" }
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          Write-Host "Installer built OK"
+          Get-ChildItem installer\WangAnZhiDun-Setup.exe | ForEach-Object { Write-Host "  $($_.Name) $($_.Length) bytes" }
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
