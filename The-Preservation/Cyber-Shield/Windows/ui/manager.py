@@ -1,29 +1,17 @@
-"""统一 UI 管理器：网安智盾所有图形界面的唯一入口。
+"""统一 UI 管理器（UI 改进版）：网安智盾所有图形界面的唯一入口。
 
-设计要点（重要）：
-    tkinter 不支持跨线程多 Tk() 实例，也**不支持跨线程调用任何 Tk 方法**
-    （包括 root.after）。本工具既有系统托盘（pystray 线程），又有取证回调
-    （monitor 线程）会弹确认窗，因此所有 tkinter 界面（主窗口 = 根 Tk，
-    配置窗 / 确认弹窗 = 其上的 Toplevel）统一跑在**一个 UI 线程、一个 Tk 根** 上。
+相对旧版改进：
+    - add_event 增加 kind 参数（forensics / anti / test），支持事件列表按类型着色；
+    - ask_confirm 增加可选 evidence_files / target_account / event_time，
+      启用反伤弹窗的「标准弹药预览」与证据缩略图（向后兼容，缺省不影响旧调用）。
 
-线程安全模型（关键）：
-    UI 线程外**禁止直接触碰 Tk**。所有 UI 操作通过 self._queue（queue.Queue）
-    投递，由 UI 线程内的 _pump 轮询循环取出并在 UI 线程上执行。_pump 自身用
-    root.after(...) 重新调度，而 root.after 只会在 UI 线程内被调用，因此安全。
-    这样即使主线程在 mainloop 启动前就调用 set_rec_enabled，也只会被安全入队，
-    等 UI 线程就绪后由泵执行，不会出现 "main thread is not in main loop"。
-
-UI 线程外调用（monitor / pystray / 主线程）：
-    show / hide / toggle / set_running / add_event / set_stats / set_rec_enabled
-    open_config / refresh  —— 非阻塞，仅投递刷新任务
-    ask_confirm(...) —— 阻塞调用线程直到用户确认或超时（结果经回调返回）
+线程安全模型不变：所有 UI 操作经 self._queue 投递到 UI 线程泵执行。
 """
 import queue
 import threading
 from typing import Callable, Dict, Optional
 
 import tkinter as tk
-
 
 class UIManager:
     """拥有唯一 Tk 根，管理主窗口 / 配置窗 / 确认弹窗。"""
@@ -40,18 +28,14 @@ class UIManager:
         self._config_dlg = None
         self._running = True
         self._start_minimized = start_minimized
-        self._startup_error = None  # UI 线程启动异常时记录 traceback
-        # 跨线程安全投递队列：所有 UI 操作都进这里，由 UI 线程泵取出执行
+        self._startup_error = None
         self._queue: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
     # ---------------- 生命周期 ----------------
     def start(self):
         self._ui_thread = threading.Thread(target=self._run, daemon=True)
         self._ui_thread.start()
-        # 等根窗口就绪，保证后续调用 root 非 None
         self._ready.wait(timeout=10)
-        # UI 线程若启动失败，把异常抛回主线程，由 main() 弹窗并退出，
-        # 而不是让进程「无界面」地静默常驻。
         if getattr(self, "_startup_error", None):
             raise RuntimeError(f"UI 初始化失败：\n{self._startup_error}")
 
@@ -72,8 +56,6 @@ class UIManager:
             self._main = MainWindow(self.root, {**self.cb, "logo": self.logo})
             self._ready.set()
 
-            # 正常启动：无论是否开机自启，先把窗口顶到前台显示一次，
-            # 避免「进程在跑、窗口却没弹出来」的假象（exe 无控制台，崩溃会被吞）。
             try:
                 self.root.deiconify()
                 self.root.lift()
@@ -82,18 +64,15 @@ class UIManager:
             except Exception:
                 pass
 
-            # 仅当明确开机自启时才收起（仅留托盘）；否则保持可见
             if self._start_minimized:
                 try:
                     self.root.withdraw()
                 except Exception:
                     pass
 
-            # 启动队列泵（root.after 仅在 UI 线程内调用，安全）
             self.root.after(self.POLL_MS, self._pump)
             self.root.mainloop()
         except Exception as e:  # noqa: BLE001
-            # UI 线程任何异常都不再静默吞掉：写崩溃日志 + 把异常交给主线程弹窗
             import os
             import sys
             import traceback
@@ -105,7 +84,6 @@ class UIManager:
                 log.error(f"UI 线程启动失败：\n{tb}")
             except Exception:
                 pass
-            # 崩溃日志写到 exe 同目录，便于排查「窗口没弹出」的真实原因
             try:
                 base = os.path.dirname(os.path.abspath(sys.argv[0]))
             except Exception:
@@ -116,9 +94,9 @@ class UIManager:
                     f.write(f"\n[{datetime.now()}] UI 启动失败:\n{tb}\n")
             except Exception:
                 pass
-            self._ready.set()  # 解除 start() 的等待，让主线程去弹错误
+            self._ready.set()
 
-    # ---------------- UI 线程泵（只在 UI 线程内运行） ----------------
+    # ---------------- UI 线程泵 ----------------
     def _pump(self):
         try:
             while True:
@@ -126,13 +104,10 @@ class UIManager:
                 try:
                     fn()
                 except Exception:
-                    # 单个回调异常不应击垮泵
                     pass
                 self._queue.task_done()
         except queue.Empty:
             pass
-
-        # 继续轮询；仅在 UI 线程内调用 root.after，安全
         if self.root is not None:
             try:
                 if self.root.winfo_exists():
@@ -140,12 +115,10 @@ class UIManager:
             except Exception:
                 pass
 
-    # ---------------- 线程安全调度（核心） ----------------
+    # ---------------- 线程安全调度 ----------------
     def _dispatch(self, fn: Callable[[], None]):
-        """把 UI 操作投递到队列。绝不在 UI 线程外直接调用 Tk 方法。"""
         self._queue.put(fn)
 
-    # 历史别名，保持调用点兼容
     def _safe(self, fn: Callable[[], None]):
         self._dispatch(fn)
 
@@ -167,7 +140,6 @@ class UIManager:
         self._dispatch(self.root.withdraw)
 
     def toggle(self):
-        # winfo_viewable 也是 Tk 调用，必须进队列在 UI 线程判断
         self._dispatch(self._toggle_now)
 
     def _toggle_now(self):
@@ -179,7 +151,7 @@ class UIManager:
             self.root.deiconify()
             self.root.lift()
 
-    # ---------------- 状态刷新（非阻塞） ----------------
+    # ---------------- 状态刷新 ----------------
     def set_running(self, running: bool):
         self._running = running
         self._dispatch(lambda: self._main.set_running(running))
@@ -187,23 +159,26 @@ class UIManager:
     def set_rec_enabled(self, enabled: bool):
         self._dispatch(lambda: self._main.set_rec_enabled(enabled))
 
-    def add_event(self, time_str: str, source: str, keyword: str):
-        self._dispatch(lambda: self._main.add_event(time_str, source, keyword))
+    def add_event(self, time_str: str, source: str, keyword: str,
+                  kind: str = "forensics"):
+        """新增事件到列表。kind 用于着色：forensics / anti / test / info。"""
+        self._dispatch(lambda: self._main.add_event(time_str, source, keyword, kind))
 
     def set_stats(self, forensics: int, evidence: int, anti: int):
         self._dispatch(lambda: self._main.set_stats(forensics, evidence, anti))
 
+    def set_uptime(self, seconds: int):
+        self._dispatch(lambda: self._main.set_uptime(seconds))
+
     def copy_text(self, text: str):
-        """把文本复制到系统剪贴板（在 UI 线程执行，线程安全）。"""
         self._dispatch(lambda: (self.root.clipboard_clear(),
                                 self.root.clipboard_append(text)))
 
-    # ---------------- 配置窗（非阻塞） ----------------
+    # ---------------- 配置窗 ----------------
     def open_config(self, config, on_applied: Callable = None):
         from ui.config_window import ConfigWindow
 
         def build():
-            # 已有则置顶，避免叠加
             if self._config_dlg is not None:
                 try:
                     if self._config_dlg.winfo_exists():
@@ -218,11 +193,14 @@ class UIManager:
 
     # ---------------- 确认弹窗（阻塞调用线程） ----------------
     def ask_confirm(self, source_app: str, text: str, clause: str,
-                    timeout: int = 30) -> bool:
-        """阻塞当前线程直到用户确认 / 放弃 / 超时，返回是否确认反伤。
+                    timeout: int = 30, evidence_files=None,
+                    target_account: str = "", event_time: str = "") -> bool:
+        """阻塞当前线程直到用户确认 / 放弃 / 超时，返回 (是否确认, 条款)。
 
-        注意：必须从非 UI 线程调用（取证回调在 monitor 线程）。
-        内部通过队列让 UI 线程构建弹窗，本线程仅等待 done 事件。
+        新增可选参数（向后兼容）：
+            evidence_files: 证据附件路径列表（启用弹窗缩略图与预览）；
+            target_account: 目标账号（缺省由用户在举报通道填写）；
+            event_time:     取证时间字符串。
         """
         from ui.confirm_dialog import ConfirmDialog
 
@@ -236,11 +214,11 @@ class UIManager:
 
         def build():
             dlg = ConfirmDialog(self.root, source_app, text, clause, timeout,
-                                on_result)
+                                on_result, evidence_files=evidence_files,
+                                target_account=target_account, event_time=event_time)
             dlg.show()
 
         if threading.current_thread() is self._ui_thread:
-            # 不应在此路径调用；直接构建以防卡死（调用方需保证不在 UI 线程）
             build()
         else:
             self._dispatch(build)

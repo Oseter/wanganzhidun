@@ -1,11 +1,9 @@
-"""系统托盘：常驻后台，右键菜单控制。
+"""系统托盘（UI 改进版）：常驻后台，右键菜单控制。
 
-菜单项：
-    显示主窗口  — 打开/聚焦主仪表盘
-    打开证据目录 — 资源管理器打开 evidence/
-    设置        — 打开配置窗口
-    暂停/继续   — 切换监听（标签随状态变化）
-    退出        — 停止并退出
+相对旧版改进：
+    - 菜单增强：新增「立即测试取证 / 关于 / 重载配置」（回调缺失则自动隐藏，向后兼容）；
+    - 暂停态图标变灰：set_running(False) 时切换为灰色盾牌，状态一眼可见；
+    - 悬停提示显示运行状态（pystray 标题）。
 
 盾牌图标由 icons 模块纯代码绘制，不依赖外部资源。
 """
@@ -21,13 +19,18 @@ class TrayApp:
 
     def __init__(self, evidence_dir: str, ui: Optional[Callable] = None,
                  on_settings: Callable = None, on_open_evidence: Callable = None,
-                 on_toggle: Callable[[bool], None] = None, on_quit: Callable = None):
+                 on_toggle: Callable[[bool], None] = None, on_quit: Callable = None,
+                 on_test: Callable = None, on_about: Callable = None,
+                 on_reload: Callable = None):
         self.evidence_dir = evidence_dir
         self.ui = ui
         self.on_settings = on_settings
         self.on_open_evidence = on_open_evidence
         self.on_toggle = on_toggle
         self.on_quit = on_quit
+        self.on_test = on_test
+        self.on_about = on_about
+        self.on_reload = on_reload
         self._running = True
         self._icon = None
         self._thread = None
@@ -50,6 +53,18 @@ class TrayApp:
             if self.on_settings:
                 self.on_settings()
 
+        def test_now(icon, item):
+            if self.on_test:
+                self.on_test()
+
+        def about(icon, item):
+            if self.on_about:
+                self.on_about()
+
+        def reload_cfg(icon, item):
+            if self.on_reload:
+                self.on_reload()
+
         def toggle(icon, item):
             self._running = not self._running
             if self.on_toggle:
@@ -61,21 +76,31 @@ class TrayApp:
                 self.on_quit()
             icon.stop()
 
-        return Menu(
+        items = [
             MenuItem("显示主窗口", show_main),
             MenuItem("打开证据目录", open_evidence),
             MenuItem("设置", settings),
-            MenuItem(lambda i, m: "继续监听" if not self._running else "暂停监听",
-                     toggle),
-            Menu.SEPARATOR,
-            MenuItem("退出", quit_app),
-        )
+        ]
+        if self.on_test is not None:
+            items.append(MenuItem("立即测试取证", test_now))
+        if self.on_reload is not None:
+            items.append(MenuItem("重载配置", reload_cfg))
+        items.append(MenuItem(
+            lambda i, m: "继续监听" if not self._running else "暂停监听", toggle))
+        items.append(Menu.SEPARATOR)
+        if self.on_about is not None:
+            items.append(MenuItem("关于网安智盾", about))
+        items.append(MenuItem("退出", quit_app))
+        return Menu(*items)
 
     def _run(self):
         import pystray
 
         self._icon = pystray.Icon(
-            "WangAnZhiDun", tray_icon(64), "网安智盾", self._build_menu()
+            "WangAnZhiDun",
+            tray_icon(64, active=self._running),
+            "网安智盾",
+            self._build_menu(),
         )
         self._icon.run()
 
@@ -91,6 +116,10 @@ class TrayApp:
     def set_running(self, running: bool):
         self._running = running
         if self._icon:
+            try:
+                self._icon.icon = tray_icon(64, active=running)
+            except Exception:
+                pass
             try:
                 self._icon.update_menu()
             except Exception:
