@@ -22,12 +22,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Build APK (debug)
-        working-directory: The-Preservation/Cyber-Shield/Android
-        run: gradle :app:assembleDebug
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: '8.9'
+          build-root-directory: The-Preservation/Cyber-Shield/Android
+          arguments: ':app:assembleDebug'
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
