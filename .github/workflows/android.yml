@@ -7,6 +7,9 @@ on:
       - 'The-Preservation/Cyber-Shield/Android/**'
       - '.github/workflows/android.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,15 +22,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Build release APK
-        uses: gradle/gradle-build-action@v3
-        with:
-          gradle-version: '8.9'
-          build-root-directory: The-Preservation/Cyber-Shield/Android
-          arguments: ':app:assembleRelease'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Upload APK
+      - name: Build release APK
+        working-directory: The-Preservation/Cyber-Shield/Android
+        run: gradle :app:assembleRelease
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: WangAnZhiDun-apk
           path: The-Preservation/Cyber-Shield/Android/app/build/outputs/apk/release/*.apk
+
+      - name: Publish Release with APK
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: apk-build-${{ github.run_number }}
+          name: WangAnZhiDun APK 自动构建 #${{ github.run_number }}
+          body: |
+            网安智盾 Android APK 自动构建。
+            - WangAnZhiDun.apk：需 Android 10+，需开启通知监听 + 无障碍服务权限。
+          files: |
+            The-Preservation/Cyber-Shield/Android/app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
