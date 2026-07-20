@@ -28,7 +28,7 @@ object KeywordEngine {
     fun reload(file: File) = load(file)
 
     fun save(file: File, list: List<String>) {
-        file.writeText(Json.encodeToString(list))
+        file.writeText(Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.serializer<String>()), list))
         load(file)
     }
 
@@ -39,7 +39,7 @@ object KeywordEngine {
     fun hasMatch(text: String): Boolean = match(text).isNotEmpty()
 
     private fun seed(file: File) {
-        file.writeText(Json.encodeToString(Constants.DEFAULT_KEYWORDS))
+        file.writeText(Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.serializer<String>()), Constants.DEFAULT_KEYWORDS))
         _keywords.addAll(Constants.DEFAULT_KEYWORDS)
     }
 }

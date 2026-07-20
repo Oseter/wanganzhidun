@@ -29,9 +29,10 @@ object CaptureBuffer {
     /** 取证触发时回捞最近 count 帧（深拷贝，避免被回收） */
     fun snapshot(count: Int = Constants.SNAPSHOT_FRAMES): List<Frame> {
         synchronized(lock) {
-            val take = deque.takeLast(count.coerceAtMost(deque.size))
-            return take.map {
-                Frame(it.bitmap.copy(it.bitmap.config ?: Bitmap.Config.ARGB_8888, false), it.ts)
+            val list = deque.toList()
+            val take = list.takeLast(count.coerceAtMost(deque.size))
+            return take.map { f ->
+                Frame(f.bitmap.copy(f.bitmap.config ?: Bitmap.Config.ARGB_8888, false), f.ts)
             }
         }
     }
