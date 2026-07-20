@@ -49,10 +49,6 @@ android {
         viewBinding = true
         buildConfig = true
     }
-
-    room {
-        schemaDirectory("$projectDir/schemas")
-    }
 }
 
 dependencies {
