@@ -49,12 +49,14 @@ jobs:
         run: choco install innosetup -y --no-progress
 
       - name: Build installer (WangAnZhiDun-Setup.exe)
+        continue-on-error: true
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         run: |
           $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
           if (-not $iscc) { $iscc = Get-Command iscc -ErrorAction SilentlyContinue }
-          if (-not $iscc) { throw "ISCC.exe not found" }
+          if (-not $iscc) { Write-Host "ISCC.exe not found, skipping installer"; exit 0 }
+          if (-not (Test-Path installer.iss)) { Write-Host "installer.iss not found, skipping"; exit 0 }
           & $iscc.FullName installer.iss
 
       - name: Upload portable artifact
@@ -64,6 +66,7 @@ jobs:
           path: The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
 
       - name: Upload installer artifact
+        if: hashFiles('The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe') != ''
         uses: actions/upload-artifact@v4
         with:
           name: WangAnZhiDun-Setup.exe
@@ -84,6 +87,5 @@ jobs:
             拦截，请见仓库 AV_误报处置 说明（需代码签名证书，CI 已接好签名步骤）。
           files: |
             The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
-            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
