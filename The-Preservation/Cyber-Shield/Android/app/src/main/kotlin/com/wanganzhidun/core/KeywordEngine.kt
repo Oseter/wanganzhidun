@@ -2,8 +2,8 @@ package com.wanganzhidun.core
 
 import com.wanganzhidun.Constants
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import java.io.File
 
 /**
