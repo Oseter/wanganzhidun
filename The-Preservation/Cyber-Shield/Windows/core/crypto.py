@@ -2,35 +2,63 @@
 
 密钥由用户密码派生（PBKDF2 + Fernet）。零代码用户首次运行时会引导设置密码；
 未设置密码则使用设备级默认密钥（仍优于明文）。
+
+cryptography 依赖在 PyInstaller 打包后可能因环境问题无法导入，
+因此全部改为延迟加载，导入失败时降级为明文存储（不影响程序启动）。
 """
 import base64
 import os
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+
+# 延迟导入，打包后 cryptography 的 _rust.pyd 或 OpenSSL DLL 可能因
+# 杀软拦截 / 缺少 VC 运行时等原因无法加载，顶层 import 会阻止整个程序启动。
+_Fernet = None
+_hashes = None
+_PBKDF2HMAC = None
+_crypto_available = None
+
+
+def _ensure_crypto():
+    global _Fernet, _hashes, _PBKDF2HMAC, _crypto_available
+    if _crypto_available is not None:
+        return _crypto_available
+    try:
+        from cryptography.fernet import Fernet as _F
+        from cryptography.hazmat.primitives import hashes as _h
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC as _P
+        _Fernet = _F
+        _hashes = _h
+        _PBKDF2HMAC = _P
+        _crypto_available = True
+    except Exception:
+        _crypto_available = False
+    return _crypto_available
 
 
 class EvidenceCrypto:
-    """证据文件加解密工具。"""
+    """证据文件加解密工具。cryptography 不可用时降级为明文（不加密）。"""
 
     SALT_FILE = "crypto_salt.bin"
     KEY_FILE = "crypto_key.bin"
 
     def __init__(self, work_dir: str):
         self.work_dir = work_dir
+        self._available = _ensure_crypto()
         os.makedirs(work_dir, exist_ok=True)
-        self._key = self._load_or_create_key()
+        self._key = self._load_or_create_key() if self._available else b""
+
+    @property
+    def available(self) -> bool:
+        return self._available
 
     def _load_or_create_key(self) -> bytes:
         key_path = os.path.join(self.work_dir, self.KEY_FILE)
         if os.path.exists(key_path):
             with open(key_path, "rb") as f:
                 return f.read()
-        # 首次运行：生成随机密钥（相当于设备级默认保护）
-        key = Fernet.generate_key()
+        key = _Fernet.generate_key()
         with open(key_path, "wb") as f:
             f.write(key)
-        # 密钥文件仅当前用户可读
         try:
             os.chmod(key_path, 0o600)
         except OSError:
@@ -38,7 +66,8 @@ class EvidenceCrypto:
         return key
 
     def set_user_password(self, password: str):
-        """用用户密码重新派生密钥（可选，提升安全性）。"""
+        if not self._available:
+            return
         salt_path = os.path.join(self.work_dir, self.SALT_FILE)
         if os.path.exists(salt_path):
             with open(salt_path, "rb") as f:
@@ -47,8 +76,8 @@ class EvidenceCrypto:
             salt = os.urandom(16)
             with open(salt_path, "wb") as f:
                 f.write(salt)
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(), length=32, salt=salt, iterations=200_000
+        kdf = _PBKDF2HMAC(
+            algorithm=_hashes.SHA256(), length=32, salt=salt, iterations=200_000
         )
         derived = base64.urlsafe_b64encode(kdf.derive(password.encode("utf-8")))
         with open(os.path.join(self.work_dir, self.KEY_FILE), "wb") as f:
@@ -56,10 +85,16 @@ class EvidenceCrypto:
         self._key = derived
 
     def encrypt_file(self, src_path: str, dst_path: str = None) -> str:
-        """加密文件，默认输出为 src_path + '.enc'。"""
         if dst_path is None:
             dst_path = src_path + ".enc"
-        f = Fernet(self._key)
+        if not self._available:
+            # 降级：直接复制（不加密）
+            with open(src_path, "rb") as fp:
+                data = fp.read()
+            with open(dst_path, "wb") as fp:
+                fp.write(data)
+            return dst_path
+        f = _Fernet(self._key)
         with open(src_path, "rb") as fp:
             data = fp.read()
         token = f.encrypt(data)
@@ -70,7 +105,13 @@ class EvidenceCrypto:
     def decrypt_file(self, src_path: str, dst_path: str = None) -> str:
         if dst_path is None:
             dst_path = src_path[:-4] if src_path.endswith(".enc") else src_path + ".dec"
-        f = Fernet(self._key)
+        if not self._available:
+            with open(src_path, "rb") as fp:
+                data = fp.read()
+            with open(dst_path, "wb") as fp:
+                fp.write(data)
+            return dst_path
+        f = _Fernet(self._key)
         with open(src_path, "rb") as fp:
             token = fp.read()
         data = f.decrypt(token)
