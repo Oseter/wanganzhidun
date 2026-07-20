@@ -1,0 +1,31 @@
+
+[2026-07-20 16:46:44.448287] UI 启动失败:
+Traceback (most recent call last):
+  File "/tmp/wanganzhidun/The-Preservation/Cyber-Shield/Windows/ui/manager.py", line 48, in _run
+    self.root = tk.Tk()
+                ^^^^^^^
+  File "/root/.pyenv/versions/3.11.1/lib/python3.11/tkinter/__init__.py", line 2326, in __init__
+    self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_tkinter.TclError: couldn't connect to display ":0"
+
+
+[2026-07-20 16:46:44.450798] 致命错误:
+Traceback (most recent call last):
+  File "/tmp/wanganzhidun/The-Preservation/Cyber-Shield/Windows/main.py", line 319, in main
+    app.start(start_minimized=start_minimized)
+  File "/tmp/wanganzhidun/The-Preservation/Cyber-Shield/Windows/main.py", line 255, in start
+    self.ui.start()
+  File "/tmp/wanganzhidun/The-Preservation/Cyber-Shield/Windows/ui/manager.py", line 40, in start
+    raise RuntimeError(f"UI 初始化失败：\n{self._startup_error}")
+RuntimeError: UI 初始化失败：
+Traceback (most recent call last):
+  File "/tmp/wanganzhidun/The-Preservation/Cyber-Shield/Windows/ui/manager.py", line 48, in _run
+    self.root = tk.Tk()
+                ^^^^^^^
+  File "/root/.pyenv/versions/3.11.1/lib/python3.11/tkinter/__init__.py", line 2326, in __init__
+    self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_tkinter.TclError: couldn't connect to display ":0"
+
+

@@ -314,6 +314,11 @@ def main():
     start_minimized = any(
         a in ("--minimized", "--startup", "-m") for a in sys.argv[1:]
     )
+    debug = any(a == "--debug" for a in sys.argv[1:])
+    if debug:
+        import logging
+        from core.logger import setup_logger
+        setup_logger(level=logging.DEBUG)
     app = WangAnZhiDun()
     try:
         app.start(start_minimized=start_minimized)

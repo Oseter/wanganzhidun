@@ -40,35 +40,51 @@ class UIManager:
             raise RuntimeError(f"UI 初始化失败：\n{self._startup_error}")
 
     def _run(self):
-        from PIL import ImageTk
+        # 延迟导入，避免打包时模块缺失导致整个 UI 线程崩溃
+        try:
+            from PIL import ImageTk  # noqa: F811
+        except Exception:
+            ImageTk = None
         from ui.main_window import MainWindow
         from ui.icons import window_logo
 
         try:
             self.root = tk.Tk()
             self.root.title("网安智盾 · WangAnZhiDun")
-            pil = window_logo(40)
+            self.root.withdraw()  # 先隐藏，构造完再显示，避免闪烁
+
+            # Logo：ImageTk 不可用时降级跳过，不让整个窗口崩溃
+            self.logo = None
             try:
-                self.logo = ImageTk.PhotoImage(pil)
+                pil = window_logo(40)
+                if ImageTk is not None:
+                    self.logo = ImageTk.PhotoImage(pil)
             except Exception:
-                self.logo = None
+                pass
 
             self._main = MainWindow(self.root, {**self.cb, "logo": self.logo})
             self._ready.set()
 
-            try:
-                self.root.deiconify()
-                self.root.lift()
-                self.root.attributes("-topmost", True)
-                self.root.after(200, lambda: self.root.attributes("-topmost", False))
-            except Exception:
-                pass
-
-            if self._start_minimized:
+            # 显示窗口：多重保证一定能弹出来
+            if not self._start_minimized:
                 try:
-                    self.root.withdraw()
+                    self.root.deiconify()
                 except Exception:
                     pass
+                try:
+                    self.root.lift()
+                except Exception:
+                    pass
+                try:
+                    self.root.focus_force()
+                except Exception:
+                    pass
+                try:
+                    self.root.attributes("-topmost", True)
+                    self.root.after(300, lambda: self.root.attributes("-topmost", False))
+                except Exception:
+                    pass
+            # 即使最小化启动，也确保窗口已构造完毕（托盘可随时 show）
 
             self.root.after(self.POLL_MS, self._pump)
             self.root.mainloop()
@@ -124,7 +140,16 @@ class UIManager:
 
     # ---------------- 主窗口显隐 ----------------
     def show(self):
-        self._dispatch(lambda: (self.root.deiconify(), self.root.lift()))
+        def _do_show():
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+                self.root.attributes("-topmost", True)
+                self.root.after(300, lambda: self.root.attributes("-topmost", False))
+            except Exception:
+                pass
+        self._dispatch(_do_show)
         refresh = self.cb.get("on_refresh")
         if callable(refresh):
             try:
@@ -145,11 +170,17 @@ class UIManager:
     def _toggle_now(self):
         if self.root is None:
             return
-        if self.root.winfo_viewable():
-            self.root.withdraw()
-        else:
-            self.root.deiconify()
-            self.root.lift()
+        try:
+            if self.root.winfo_viewable():
+                self.root.withdraw()
+            else:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+                self.root.attributes("-topmost", True)
+                self.root.after(300, lambda: self.root.attributes("-topmost", False))
+        except Exception:
+            pass
 
     # ---------------- 状态刷新 ----------------
     def set_running(self, running: bool):

@@ -32,10 +32,16 @@ collected_hiddenimports = [
     "tkinter.filedialog",
     "tkinter.messagebox",
     "tkinter.simpledialog",
-    # 图标绘制
+    # 图标绘制 — 打包时必须显式声明
     "PIL",
+    "PIL.Image",
     "PIL.ImageTk",
     "PIL.ImageDraw",
+    "PIL.ImageFont",
+    # pystray 后端（Windows 需要 win32api）
+    "pystray",
+    "pystray._win32",
+    # 截图
     "mss",
 ]
 

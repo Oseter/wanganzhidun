@@ -96,13 +96,35 @@ class TrayApp:
     def _run(self):
         import pystray
 
-        self._icon = pystray.Icon(
-            "WangAnZhiDun",
-            tray_icon(64, active=self._running),
-            "网安智盾",
-            self._build_menu(),
-        )
-        self._icon.run()
+        try:
+            icon_img = tray_icon(64, active=self._running)
+        except Exception:
+            # 图标绘制失败时用纯色占位，不让托盘崩溃
+            from PIL import Image
+            icon_img = Image.new("RGBA", (64, 64), (33, 120, 200, 255))
+
+        try:
+            self._icon = pystray.Icon(
+                "WangAnZhiDun",
+                icon_img,
+                "网安智盾",
+                self._build_menu(),
+            )
+            self._icon.run()
+        except Exception as e:
+            import os
+            import sys
+            from datetime import datetime
+            try:
+                base = os.path.dirname(os.path.abspath(sys.argv[0]))
+            except Exception:
+                base = "."
+            try:
+                with open(os.path.join(base, "wangzhidun_crash.log"),
+                          "a", encoding="utf-8") as f:
+                    f.write(f"\n[{datetime.now()}] 托盘启动失败:\n{e}\n")
+            except Exception:
+                pass
 
     def start(self):
         self._thread = __import__("threading").Thread(
