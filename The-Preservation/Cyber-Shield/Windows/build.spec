@@ -41,6 +41,8 @@ collected_hiddenimports = [
     # pystray 后端（Windows 需要 win32api）
     "pystray",
     "pystray._win32",
+    # cryptography — PyInstaller hook 只覆盖 hazmat.*，fernet 需显式声明
+    "cryptography.fernet",
     # 截图
     "mss",
 ]
