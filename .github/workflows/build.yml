@@ -74,7 +74,7 @@ jobs:
           path: The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
 
       - name: Upload installer artifact
-        if: hashFiles('The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe') != ''
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: WangAnZhiDun-Setup.exe
