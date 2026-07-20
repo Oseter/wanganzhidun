@@ -32,7 +32,7 @@ jobs:
         run: pyinstaller build.spec
 
       - name: Sign exe (Authenticode)
-        if: ${{ secrets.WIN_CERT_PFX != '' }}
+        if: false  # 需配置 WIN_CERT_PFX / WIN_CERT_PWD secrets 后改为 true
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         env:
