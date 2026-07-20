@@ -49,30 +49,17 @@ jobs:
         run: choco install innosetup -y --no-progress
 
       - name: Build installer (WangAnZhiDun-Setup.exe)
-        continue-on-error: true
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         run: |
-          # Inno Setup 中文语言包在 choco 版可能缺失，先试 ISCC，失败则用 zip 兜底
           $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
           if (-not $iscc) { $iscc = Get-Command iscc -ErrorAction SilentlyContinue }
-          if ($iscc) {
-            Write-Host "ISCC: $($iscc.FullName)"
-            & $iscc.FullName installer.iss 2>&1 | ForEach-Object { Write-Host $_ }
-            if ($LASTEXITCODE -eq 0 -and (Test-Path installer\WangAnZhiDun-Setup.exe)) {
-              Write-Host "ISCC OK: installer\WangAnZhiDun-Setup.exe"
-              exit 0
-            }
-            Write-Host "ISCC failed or no output, falling back to zip"
-          } else {
-            Write-Host "ISCC not found, falling back to zip"
-          }
-          # Fallback: 把 dist 目录打包为 Setup.zip
-          New-Item -ItemType Directory -Force -Path installer | Out-Null
-          Compress-Archive -Path dist\WangAnZhiDun, config.ini -DestinationPath installer\WangAnZhiDun-Setup.zip -Force
-          Write-Host "Fallback OK: installer\WangAnZhiDun-Setup.zip"
-          # 重命名为 exe 伪装（实际上 GitHub 不支持，直接用 zip）
-          Write-Host "Setup package ready as installer\WangAnZhiDun-Setup.zip"
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          Write-Host "ISCC: $($iscc.FullName)"
+          & $iscc.FullName installer.iss 2>&1 | ForEach-Object { Write-Host $_ }
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path installer\WangAnZhiDun-Setup.exe)) { throw "installer\WangAnZhiDun-Setup.exe not found" }
+          Write-Host "OK: installer\WangAnZhiDun-Setup.exe"
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
@@ -81,13 +68,10 @@ jobs:
           path: The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
 
       - name: Upload installer artifact
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: WangAnZhiDun-Setup
-          path: |
-            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
-            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.zip
+          name: WangAnZhiDun-Setup.exe
+          path: The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
@@ -105,6 +89,5 @@ jobs:
           files: |
             The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
             The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
-            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
