@@ -5,6 +5,7 @@
 #define MyAppPublisher "民用武器体系"
 #define MyAppURL "https://github.com/Oseter/wanganzhidun"
 #define MyExe "WangAnZhiDun.exe"
+#define MyExeDir "WangAnZhiDun"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-1234567890AB}
@@ -44,7 +45,7 @@ SetupLogging=yes
 
 [Files]
 ; PyInstaller 产出（onedir：dist\WangAnZhiDun\ 目录）+ 配置文件，一起装到程序目录
-Source: "dist\{#MyExe}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "dist\{#MyExeDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "config.ini"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
