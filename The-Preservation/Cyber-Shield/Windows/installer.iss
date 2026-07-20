@@ -43,8 +43,9 @@ DisableProgramGroupPage=auto
 SetupLogging=yes
 
 [Languages]
-; Inno Setup 6 自带中文语言包，安装向导直接中文呈现
-Name: "ChineseSimplified"; MessagesFile: "compiler:ChineseSimplified.isl"
+; choco 版 Inno Setup 6 默认不含中文语言包，注释掉用英文安装向导
+; 本机安装 Inno Setup 并下载中文语言包后可取消注释
+; Name: "ChineseSimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
 ; PyInstaller 产出（onedir：dist\WangAnZhiDun\ 目录）+ 配置文件，一起装到程序目录
