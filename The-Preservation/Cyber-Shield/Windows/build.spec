@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # 网安智盾 Windows 版 — PyInstaller 打包配置
-# 用法：pyinstaller build.spec
+# 用法：pyinstaller build.spec              # 无控制台（生产）
+#       pyinstaller build.spec --console    # 带控制台（调试）
 # 产物：dist/WangAnZhiDun/ 目录（onedir，含 WangAnZhiDun.exe）
 #
 # 杀软降级（去威胁）要点：
@@ -11,12 +12,15 @@
 #   5. 代码签名         —— 见 sign.ps1；签 Authenticode 是消除 SmartScreen/Edge 红框的唯一办法
 
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
-
 app_name = "WangAnZhiDun"
+
+# 是否显示控制台窗口（传 --console 启用，用于调试）
+_console = "--console" in sys.argv[1:]
 
 # cryptography 的 _rust 模块、opencv/numpy 的二进制扩展、pystray 后端都必须整包收集，
 # 否则运行期会报 ModuleNotFoundError（UI 线程静默崩溃 → 表现为「窗口没弹出来」）。
@@ -24,6 +28,7 @@ collected_binaries = []
 collected_datas = []
 collected_hiddenimports = [
     # winrt 通知监听（monitor.py 实际导入路径）
+    "winrt",
     "winrt.windows.ui.notifications.management",
     "winrt.windows.ui.notifications",
     # tkinter GUI（主窗口/配置窗/确认弹窗）
@@ -45,11 +50,14 @@ collected_hiddenimports = [
     "cryptography.fernet",
     # 截图
     "mss",
+    # 标准库 — 隐式导入但打包可能遗漏
+    "ctypes",
+    "logging",
 ]
 
 # 注意：CI 的 Windows 控制台是 cp1252，print 中文会因 UnicodeEncodeError 直接崩 spec，
 # 所以这里的诊断信息只用 ASCII（源码里的中文注释不会输出，无影响）。
-for _pkg in ("cryptography", "cv2", "numpy", "pystray"):
+for _pkg in ("cryptography", "cv2", "numpy", "pystray", "mss"):
     try:
         _bin, _dat, _imp = collect_all(_pkg)
         collected_binaries += _bin
@@ -88,7 +96,7 @@ exe = EXE(
     upx=False,                # 关键：关掉 UPX，砍掉大部分误报
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,            # 无控制台窗口，常驻后台
+    console=_console,         # 默认无控制台；传 --console 开启用于调试
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,   # Windows 用 sign.ps1 的 signtool 在构建后签名

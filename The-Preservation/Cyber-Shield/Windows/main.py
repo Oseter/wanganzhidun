@@ -1,13 +1,5 @@
 """网安智盾 Windows 版 — 程序入口（UI 改进版）。
 
-相对旧版改动（仅接线与少量增强，核心取证/归档/举报逻辑不变）：
-    [UI改进-1] start() 的 callbacks 增加 on_view_db / on_about；
-                托盘 TrayApp 增加 on_test / on_about / on_reload；
-    [UI改进-2] _on_trigger 中 ask_confirm 传入 evidence_files / target_account /
-                event_time，启用反伤弹窗「标准弹药预览」与证据缩略图；
-                反伤确认后再插入一条 kind="anti" 着色事件；
-    [UI改进-3] 新增 _show_about / _reload_config / _view_reports / 运行时长刷新。
-
 红线：仅对恶意攻击取证与反制；不伪造证据；不自动举报（需用户确认）。
 """
 import os
@@ -18,49 +10,57 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core import ConfigManager, KeywordEngine, EvidenceCrypto, log
-from core.monitor import NotificationMonitor
-from core.screenshot import Screenshotter
-from core.recorder import ScreenRecorder
-from core.archiver import Archiver
-from core.reporter import Reporter
-from db.database import Database
-from ui.manager import UIManager
-from ui.tray import TrayApp
+# ============================================================
+# 所有第三方包导入全部延迟到 main() 内，确保 ImportError 能
+# 被 _fatal_error 捕获并显示（否则 console=False 时崩得无声）。
+# ============================================================
+
+# ---------- 早期崩溃弹窗（ctypes 兜底，不依赖 tkinter） ----------
+def _early_msgbox(title: str, message: str):
+    """完全不依赖任何第三方库的消息框，用于报告启动前崩溃。"""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, message, title, 0x10)
+    except Exception:
+        pass
 
 
 class WangAnZhiDun:
-    def __init__(self):
+    def __init__(self, **deps):
+        self._ = deps  # 存为 dict，避免局部变量过长
+
         if getattr(sys, "frozen", False):
             base = os.path.dirname(sys.executable)
         else:
             base = os.path.dirname(os.path.abspath(__file__))
         self.base = base
-        self.cfg_path = os.path.join(base, "config.ini")  # [UI改进] 保存路径供重载
-        self.cfg = ConfigManager(self.cfg_path)
-        self.db = Database(os.path.join(base, "wanganzhidun.db"))
-        self.crypto = EvidenceCrypto(base)
-        self.kw = KeywordEngine(self.cfg.keywords)
+        self.cfg_path = os.path.join(base, "config.ini")
+        self.cfg = self._["ConfigManager"](self.cfg_path)
+        self.db = self._["Database"](os.path.join(base, "wanganzhidun.db"))
+        self.crypto = self._["EvidenceCrypto"](base)
+        self.kw = self._["KeywordEngine"](self.cfg.keywords)
 
-        self.screenshotter = Screenshotter(
+        self.screenshotter = self._["Screenshotter"](
             self.cfg.save_path, self.cfg.screenshot_format, self.cfg.max_screenshots
         )
-        self.recorder = ScreenRecorder(**self.cfg.recorder)
-        self.archiver = Archiver(
+        self.recorder = self._["ScreenRecorder"](**self.cfg.recorder)
+        self.archiver = self._["Archiver"](
             self.cfg.save_path, self.cfg.encrypt, self.crypto, self.cfg.default_clause
         )
-        self.reporter = Reporter(self.cfg.email, os.path.join(base, "reports"), self.crypto)
+        self.reporter = self._["Reporter"](self.cfg.email, os.path.join(base, "reports"), self.crypto)
 
         self.monitor = None
         self.tray = None
         self.ui = None
         self._last_trigger = 0
         self._paused = False
-        self._start_ts = time.time()  # [UI改进] 运行时长基准
+        self._start_ts = time.time()
 
         self._c_forensics = 0
         self._c_evidence = 0
         self._c_anti = 0
+
+        self._log = self._["log"]
 
     # ---------- 核心：命中处理 ----------
     def _on_trigger(self, app: str, text: str, ts: float):
@@ -68,7 +68,7 @@ class WangAnZhiDun:
             return
         self._last_trigger = ts
 
-        log.info(f"取证触发：{app} | {text[:30]}")
+        self._log.info(f"取证触发：{app} | {text[:30]}")
 
         if self.cfg.capture_delay > 0:
             time.sleep(self.cfg.capture_delay)
@@ -120,11 +120,11 @@ class WangAnZhiDun:
                                   self.kw.match(text) or "命中", kind="anti")  # [UI改进]
                 self.ui.set_stats(self._c_forensics, self._c_evidence, self._c_anti)
                 summary = "，".join(f"{n}{'✓' if ok else '✗'}" for n, ok, _ in results)
-                log.info(f"反伤并发举报：{summary}")
+                self._log.info(f"反伤并发举报：{summary}")
                 if self.tray:
                     self.tray.notify("网安智盾 · 反伤", f"已并发发起举报：{summary}")
             else:
-                log.info("用户放弃反伤。")
+                self._log.info("用户放弃反伤。")
 
         if self.tray:
             self.tray.notify("网安智盾", f"已取证：{app}")
@@ -147,7 +147,7 @@ class WangAnZhiDun:
         self.reporter.email_cfg = config.email
         if self.ui:
             self.ui.set_rec_enabled(rec["enabled"])
-        log.info("配置已热更新。")
+        self._log.info("配置已热更新。")
 
     # ---------- 交互动作 ----------
     def _toggle_monitor(self):
@@ -162,7 +162,7 @@ class WangAnZhiDun:
             self.ui.set_running(running)
         if self.tray:
             self.tray.set_running(running)
-        log.info("监听已" + ("恢复" if running else "暂停"))
+        self._log.info("监听已" + ("恢复" if running else "暂停"))
 
     def _open_evidence(self):
         self._open_dir(self.cfg.save_path)
@@ -177,7 +177,7 @@ class WangAnZhiDun:
             else:
                 os.system(f'xdg-open "{path}"')
         except Exception as e:
-            log.warning(f"打开目录失败：{e}")
+            self._log.warning(f"打开目录失败：{e}")
 
     def _show_about(self):  # [UI改进] 关于
         try:
@@ -199,12 +199,12 @@ class WangAnZhiDun:
 
     def _reload_config(self):  # [UI改进] 重载配置
         try:
-            self.cfg = ConfigManager(self.cfg_path)
+            self.cfg = self._["ConfigManager"](self.cfg_path)
             self._apply_config(self.cfg)
             if self.tray:
                 self.tray.notify("网安智盾", "配置已重载并热更新。")
         except Exception as e:
-            log.warning(f"重载配置失败：{e}")
+            self._log.warning(f"重载配置失败：{e}")
 
     def _hide_ui(self):
         if self.ui:
@@ -236,11 +236,15 @@ class WangAnZhiDun:
 
     # ---------- 生命周期 ----------
     def start(self, start_minimized: bool = False):
+        UIManager = self._["UIManager"]
+        NotificationMonitor = self._["NotificationMonitor"]
+        TrayApp = self._["TrayApp"]
+
         self.ui = UIManager({
             "on_settings": lambda: self.ui.open_config(self.cfg, self._apply_config),
             "on_open_evidence": self._open_evidence,
-            "on_view_db": self._view_reports,           # [UI改进]
-            "on_about": self._show_about,               # [UI改进]
+            "on_view_db": self._view_reports,
+            "on_about": self._show_about,
             "on_toggle": self._toggle_monitor,
             "on_test": self._test_trigger,
             "on_quit": self.stop,
@@ -262,29 +266,27 @@ class WangAnZhiDun:
             ui=self.ui,
             on_settings=lambda: self.ui.open_config(self.cfg, self._apply_config),
             on_open_evidence=self._open_evidence,
-            on_test=self._test_trigger,        # [UI改进]
-            on_about=self._show_about,         # [UI改进]
-            on_reload=self._reload_config,     # [UI改进]
+            on_test=self._test_trigger,
+            on_about=self._show_about,
+            on_reload=self._reload_config,
             on_toggle=self._toggle_monitor,
             on_quit=self.stop,
         )
         self.tray.start()
-        threading.Thread(target=self._uptime_loop, daemon=True).start()  # [UI改进]
-        log.info("网安智盾已启动。")
+        threading.Thread(target=self._uptime_loop, daemon=True).start()
+        self._log.info("网安智盾已启动。")
 
     def stop(self):
         if self.monitor:
             self.monitor.stop()
         self.recorder.stop()
         self.db.close()
-        log.info("网安智盾已退出。")
+        self._log.info("网安智盾已退出。")
         os._exit(0)
 
 
 def _fatal_error(e: Exception):
-    import os
     import traceback
-    from datetime import datetime
     tb = traceback.format_exc()
     try:
         base = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -296,6 +298,8 @@ def _fatal_error(e: Exception):
             f.write(f"\n[{datetime.now()}] 致命错误:\n{tb}\n")
     except Exception:
         pass
+    # 先尝试 tkinter 弹窗
+    popped = False
     try:
         import tkinter as tk
         from tkinter import messagebox
@@ -306,11 +310,35 @@ def _fatal_error(e: Exception):
             f"程序无法启动：\n{e}\n\n详情见 wangzhidun_crash.log",
         )
         r.destroy()
+        popped = True
     except Exception:
         pass
+    # tkinter 不可用时用 ctypes 兜底
+    if not popped:
+        _early_msgbox("网安智盾 · 启动失败",
+                       f"程序无法启动：{e}\n\n详情见 wangzhidun_crash.log")
 
 
 def main():
+    # ---------- 延迟导入（避免 import 崩溃时无法显示错误） ----------
+    try:
+        from core import ConfigManager, KeywordEngine, EvidenceCrypto
+        from core.monitor import NotificationMonitor
+        from core.screenshot import Screenshotter
+        from core.recorder import ScreenRecorder
+        from core.archiver import Archiver
+        from core.reporter import Reporter
+        from core.logger import log
+        from db.database import Database
+        from ui.manager import UIManager
+        from ui.tray import TrayApp
+    except ImportError as e:
+        _early_msgbox("网安智盾 · 模块加载失败",
+                       f"无法加载必要模块：{e}\n\n"
+                       f"请确认所有依赖已正确打包。\n"
+                       f"尝试从 GitHub Releases 重新下载，或运行 build.bat 重新构建。")
+        raise
+
     start_minimized = any(
         a in ("--minimized", "--startup", "-m") for a in sys.argv[1:]
     )
@@ -319,7 +347,13 @@ def main():
         import logging
         from core.logger import setup_logger
         setup_logger(level=logging.DEBUG)
-    app = WangAnZhiDun()
+    app = WangAnZhiDun(
+        ConfigManager=ConfigManager, KeywordEngine=KeywordEngine,
+        EvidenceCrypto=EvidenceCrypto, NotificationMonitor=NotificationMonitor,
+        Screenshotter=Screenshotter, ScreenRecorder=ScreenRecorder,
+        Archiver=Archiver, Reporter=Reporter, log=log,
+        Database=Database, UIManager=UIManager, TrayApp=TrayApp,
+    )
     try:
         app.start(start_minimized=start_minimized)
     except Exception as e:  # noqa: BLE001
