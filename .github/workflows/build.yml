@@ -1,19 +1,20 @@
-name: Build WangAnZhiDun.exe
+name: Build & Release (EXE + APK)
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  # ========== 任务 1：构建 Windows EXE ==========
+  build-windows:
     runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -27,12 +28,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build exe with PyInstaller
+      - name: Build exe
         working-directory: The-Preservation/Cyber-Shield/Windows
         run: pyinstaller build.spec
 
       - name: Sign exe (Authenticode)
-        if: false  # 需配置 WIN_CERT_PFX / WIN_CERT_PWD secrets 后改为 true
+        if: false
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         env:
@@ -40,7 +41,7 @@ jobs:
           PFX_PWD: ${{ secrets.WIN_CERT_PWD }}
         run: .\sign_windows.ps1
 
-      - name: Package portable (onedir zip)
+      - name: Package portable
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         run: Compress-Archive -Path dist\WangAnZhiDun -DestinationPath WangAnZhiDun-portable.zip -Force
@@ -55,39 +56,99 @@ jobs:
           $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
           if (-not $iscc) { $iscc = Get-Command iscc -ErrorAction SilentlyContinue }
           if (-not $iscc) { throw "ISCC.exe not found" }
-          Write-Host "ISCC: $($iscc.FullName)"
-          & $iscc.FullName installer.iss 2>&1 | ForEach-Object { Write-Host $_ }
-          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path installer\WangAnZhiDun-Setup.exe)) { throw "installer\WangAnZhiDun-Setup.exe not found" }
-          Write-Host "OK: installer\WangAnZhiDun-Setup.exe"
+          & $iscc.FullName installer.iss 2>&1
+          if (-not (Test-Path installer\WangAnZhiDun-Setup.exe)) { throw "installer not found" }
 
-      - name: Upload portable artifact
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: WangAnZhiDun-portable
-          path: The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
+          name: windows-build
+          path: |
+            The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
+            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
 
-      - name: Upload installer artifact
+  # ========== 任务 2：构建 Android APK ==========
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build APK (debug)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: '8.9'
+          build-root-directory: The-Preservation/Cyber-Shield/Android
+          arguments: ':app:assembleDebug'
+
+      - name: Rename APK
+        working-directory: The-Preservation/Cyber-Shield/Android
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk WangAnZhiDun.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WangAnZhiDun-Setup.exe
-          path: The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
+          name: android-apk
+          path: The-Preservation/Cyber-Shield/Android/WangAnZhiDun.apk
+
+  # ========== 任务 3：合并发布 ==========
+  release:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: release-artifacts/
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release-artifacts/
+
+      - name: List artifacts
+        run: ls -la release-artifacts/
+
+      - name: Generate tag name
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=build-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main'
         with:
-          tag_name: build-${{ github.run_number }}
-          name: WangAnZhiDun 自动构建 #${{ github.run_number }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: 网安智盾 v${{ steps.tag.outputs.tag }}
           body: |
-            网安智盾 WangAnZhiDun 自动构建（Windows 64位）。
-            - WangAnZhiDun-Setup.exe：安装包（推荐，含开始菜单/桌面快捷方式/卸载）
-            - WangAnZhiDun-portable.zip：免安装目录版（解压即用，运行时不再 temp 解包）
-            常驻系统托盘，监听 QQ/微信 通知栏，关键词触发截图+自带录屏+证据归档。
-            已关闭 UPX、嵌入 asInvoker 清单与版本信息以降低误报；如仍有 SmartScreen
-            拦截，请见仓库 AV_误报处置 说明（需代码签名证书，CI 已接好签名步骤）。
+            网安智盾 WangAnZhiDun 自动构建。
+
+            ## Windows
+            - **WangAnZhiDun-Setup.exe**：安装包（推荐，含开始菜单/桌面快捷方式/卸载）
+            - **WangAnZhiDun-portable.zip**：免安装目录版（解压即用）
+
+            ## Android
+            - **WangAnZhiDun.apk**：需 Android 7.0+，需开启通知监听+无障碍服务权限
+
+            ## 红线
+            仅记录针对本人的恶意攻击，证据真实，经官方合规渠道举报；
+            不伪造证据、不自动举报、不向非恶意目标使用。
           files: |
-            The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
-            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
+            release-artifacts/WangAnZhiDun-portable.zip
+            release-artifacts/WangAnZhiDun-Setup.exe
+            release-artifacts/WangAnZhiDun.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -34,17 +34,3 @@ jobs:
         with:
           name: WangAnZhiDun-apk
           path: The-Preservation/Cyber-Shield/Android/app/build/outputs/apk/debug/*.apk
-
-      - name: Publish Release with APK
-        uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main'
-        with:
-          tag_name: apk-build-${{ github.run_number }}
-          name: WangAnZhiDun APK 自动构建 #${{ github.run_number }}
-          body: |
-            网安智盾 Android APK 自动构建（debug 签名）。
-            - WangAnZhiDun.apk：需 Android 7.0+，需开启通知监听 + 无障碍服务权限。
-          files: |
-            The-Preservation/Cyber-Shield/Android/app/build/outputs/apk/debug/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
