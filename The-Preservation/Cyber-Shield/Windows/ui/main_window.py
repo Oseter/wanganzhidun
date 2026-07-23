@@ -177,8 +177,6 @@ class MainWindow:
                                 bg="white", fg=C_TEXT, height=9,
                                 selectbackground=C_ACCENT, activestyle="none",
                                 relief="flat", bd=0)
-        for kind, color in KIND_COLOR.items():
-            self._list.tag_configure(kind, foreground=color)
         sb = ttk.Scrollbar(f, orient="vertical", command=self._list.yview)
         self._list.configure(yscrollcommand=sb.set)
         self._list.pack(side="left", fill="both", expand=True, padx=8, pady=8)
@@ -196,11 +194,11 @@ class MainWindow:
 
     def add_event(self, time_str: str, source: str, keyword: str, kind: str = "forensics"):
         self._hide_empty()
-        tag = kind if kind in KIND_COLOR else "forensics"
-        label = KIND_TAG.get(tag, "取证")
+        color = KIND_COLOR.get(kind, C_TEXT)
+        label = KIND_TAG.get(kind, "取证")
         line = f"[{label}] [{time_str}] {source} · {keyword}"
         self._list.insert(0, line)
-        self._list.itemconfig(0, tag)
+        self._list.itemconfig(0, fg=color)
         if self._list.size() > 200:
             self._list.delete(200)
 
@@ -212,15 +210,15 @@ class MainWindow:
             self._empty.lift()
             return
         self._hide_empty()
-        for ev in events:
+        for idx, ev in enumerate(events):
             ts = (ev.get("timestamp") or "")[:19].replace("T", " ")
             src = ev.get("source_app") or "未知"
             kw = ev.get("keyword") or "命中"
             kind = ev.get("event_type", "forensics")
-            tag = kind if kind in KIND_COLOR else "forensics"
-            label = KIND_TAG.get(tag, "取证")
+            color = KIND_COLOR.get(kind, C_TEXT)
+            label = KIND_TAG.get(kind, "取证")
             self._list.insert("end", f"[{label}] [{ts}] {src} · {kw}")
-            self._list.itemconfig("end", tag)
+            self._list.itemconfig(idx, fg=color)
 
     def _build_actions(self):
         fg = tk.Frame(self.root, bg=C_BG)
