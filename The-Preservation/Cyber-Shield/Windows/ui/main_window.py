@@ -105,8 +105,8 @@ class MainWindow:
             lbl_img.pack(side="left", padx=14, pady=12)
         titles = tk.Frame(f, bg=C_HEADER)
         titles.pack(side="left", anchor="w", pady=(10, 0))
-        tk.Label(titles, text="网安智盾", style="Title.TLabel").pack(anchor="w")
-        tk.Label(titles, text="WangAnZhiDun · 存护命途 · 防打号 / 防点号 / 反伤",
+        ttk.Label(titles, text="网安智盾", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(titles, text="WangAnZhiDun · 存护命途 · 防打号 / 防点号 / 反伤",
                  style="Sub.TLabel").pack(anchor="w", pady=(2, 0))
         # 右侧运行时长
         self._uptime_var = tk.StringVar(value="运行 00:00")
@@ -176,9 +176,9 @@ class MainWindow:
             card = tk.Frame(f, bg=C_CARD, relief="flat", bd=1,
                             highlightbackground=C_LINE, highlightthickness=1)
             card.pack(side="left", fill="both", expand=True, padx=5, ipady=10)
-            num = tk.Label(card, text="0", style="Num.TLabel")
+            num = ttk.Label(card, text="0", style="Num.TLabel")
             num.pack(pady=(8, 0))
-            tk.Label(card, text=label, style="CardTitle.TLabel").pack()
+            ttk.Label(card, text=label, style="CardTitle.TLabel").pack()
             tk.Label(card, text=sub, bg=C_CARD, fg=C_GRAY,
                      font=("Microsoft YaHei", 8)).pack()
             self._stat_vals[key] = num

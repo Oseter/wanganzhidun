@@ -1,8 +1,8 @@
 ; 网安智盾 安装包脚本 (Inno Setup 6)
 ; CI 在 Windows runner 上用 iscc 编译，产出 WangAnZhiDun-Setup.exe
 #define MyAppName "网安智盾 WangAnZhiDun"
-#define MyAppVersion "1.3.0-beta"
-#define MyAppNumVersion "1.3.0.0"
+#define MyAppVersion "1.4.0-beta"
+#define MyAppNumVersion "1.4.0.0"
 #define MyAppPublisher "民用武器体系"
 #define MyAppURL "https://github.com/Oseter/wanganzhidun"
 #define MyExe "WangAnZhiDun.exe"
@@ -17,7 +17,7 @@ AppPublisherURL={#MyAppURL}
 ; 文件版本信息（详情页展示）
 VersionInfoVersion={#MyAppNumVersion}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=网安智盾 · 存护命途取证与反制工具（v1.3 测试版）
+VersionInfoDescription=网安智盾 · 存护命途取证与反制工具（v1.4 测试版）
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppNumVersion}
 VersionInfoCopyright=Copyright (C) 民用武器体系

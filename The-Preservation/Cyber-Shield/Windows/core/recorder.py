@@ -128,8 +128,12 @@ class ScreenRecorder:
             self.monitor_index = monitor_index
         if enabled is not None:
             self.enabled = enabled
-        # 缓冲区容量随 fps/时长变化
-        self.max_frames = max(1, int(self.fps * self.buffer_seconds))
+        # 缓冲区容量随 fps/时长变化；deque.maxlen 只读，需新建
+        new_max = max(1, int(self.fps * self.buffer_seconds))
+        if new_max != self.max_frames:
+            self.max_frames = new_max
+            with self._lock:
+                self._buf = deque(self._buf, maxlen=self.max_frames)
         # 若开启录屏但当前未运行，则启动
         if self.enabled and not self._running:
             self.start()

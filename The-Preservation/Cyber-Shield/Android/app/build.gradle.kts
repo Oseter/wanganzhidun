@@ -13,8 +13,8 @@ android {
         applicationId = "com.wanganzhidun"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.3.0-beta"
+        versionCode = 3
+        versionName = "1.4.0-beta"
 
         // AGP 8+ 默认关闭 BuildConfig，反制闭环需要读取版本与构建信息，显式开启
         buildConfigField("String", "AMMO_VERSION", "\"v1\"")

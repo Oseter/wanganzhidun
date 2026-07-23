@@ -150,13 +150,14 @@ class Reporter:
             return []
 
         results: List[Tuple[str, bool, str]] = []
+        _results_lock = threading.Lock()
 
         # W3 修复：浏览器打开不得在线程池工作线程内进行——跨线程 webbrowser.open
         # 在部分环境不可靠。每个网页通道起独立守护线程派发，与邮件的 I/O 线程池解耦。
         web_threads: List[threading.Thread] = []
         for name, url in web_jobs:
             t = threading.Thread(
-                target=self._web_result, args=(name, url, results),
+                target=self._web_result, args=(name, url, results, _results_lock),
                 name=f"web-open-{name}", daemon=True,
             )
             t.start()
@@ -173,9 +174,11 @@ class Reporter:
                     ok, note = False, str(e)
                     from .logger import log
                     log.warning(f"通道 {name} 举报失败：{note}")
-                    results.append((name, ok, note))
+                    with _results_lock:
+                        results.append((name, ok, note))
                 else:
-                    results.append((name, ok, ""))
+                    with _results_lock:
+                        results.append((name, ok, ""))
 
         # 等网页线程结束，确保汇总结果完整
         for t in web_threads:
@@ -193,7 +196,9 @@ class Reporter:
             return False
 
     @staticmethod
-    def _web_result(name: str, url: str, results: List[Tuple[str, bool, str]]):
+    def _web_result(name: str, url: str, results: List[Tuple[str, bool, str]],
+                    lock: threading.Lock):
         """独立线程内打开网页并把结果写回汇总列表（W3 修复）。"""
         ok = Reporter._open_web(url)
-        results.append((name, ok, ""))
+        with lock:
+            results.append((name, ok, ""))
