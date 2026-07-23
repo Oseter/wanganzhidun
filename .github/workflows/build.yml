@@ -59,13 +59,18 @@ jobs:
           & $iscc.FullName installer.iss 2>&1
           if (-not (Test-Path installer\WangAnZhiDun-Setup.exe)) { throw "installer not found" }
 
+      - name: Prepare Windows artifacts for upload
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path windows-release -Force
+          Copy-Item The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip windows-release/
+          Copy-Item The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe windows-release/
+
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: |
-            The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip
-            The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe
+          path: windows-release/
 
   # ========== 任务 2：构建 Android APK ==========
   build-android:
@@ -116,7 +121,7 @@ jobs:
           path: release-artifacts/
 
       - name: List artifacts
-        run: ls -la release-artifacts/
+        run: ls -laR release-artifacts/
 
       - name: Generate tag name
         id: tag
