@@ -83,7 +83,6 @@ class OBSRecorder:
             from obswebsocket import requests as obs_req
             self._ws.call(obs_req.SaveReplayBuffer())
             time.sleep(1)
-            self._ws.call(obs_req.GetReplayBufferStatus())
             return out_path
         except Exception as e:
             log.warning(f"OBS 保存回放失败：{e}")

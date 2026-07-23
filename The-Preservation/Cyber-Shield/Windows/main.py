@@ -192,7 +192,7 @@ class WangAnZhiDun:
     def _apply_config(self, config):
         self.kw.reload(config.keywords)
         if self.ui:
-            self.ui.set_rec_enabled(config.recorder["enabled"])
+            self.ui.set_rec_enabled(config.enable_recording)
         self._log.info("配置已热更新")
 
     def _toggle_monitor(self):
@@ -303,7 +303,9 @@ class WangAnZhiDun:
         self.monitor.start()
 
         self.ui.start()
-        self.ui.set_rec_enabled(self.cfg.recorder["enabled"])
+        self.ui.set_rec_enabled(self.cfg.enable_recording)
+        self.ui.set_obs_enabled(self.cfg.obs.get("enabled", False))
+        self.ui.set_enc_enabled(self.cfg.encrypt)
         self.ui.set_stats(self._c_forensics, self._c_evidence, self._c_anti, self._c_anti_tag)
         self.ui.set_uptime(0)
 

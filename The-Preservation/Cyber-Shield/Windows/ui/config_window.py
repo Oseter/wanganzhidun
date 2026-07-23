@@ -248,6 +248,7 @@ class ConfigWindow:
         c.set("email", "sender_password", self._vars["sender_password"].get())
         c.set("anti_strike", "enabled", str(self._vars["anti_enabled"].get()))
         c.set("anti_strike", "confirm_timeout", self._vars["anti_timeout"].get())
+        c.set("anti_strike", "require_attack_keyword", str(self._vars["anti_req_kw"].get()))
         c.set("standard_ammo", "default_clause", self._clause.get("1.0", "end").strip())
 
         if callable(self.on_applied):

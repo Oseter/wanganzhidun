@@ -125,6 +125,9 @@ class MainWindow:
     def set_obs_enabled(self, enabled: bool):
         self._set_pill("obs", enabled)
 
+    def set_enc_enabled(self, enabled: bool):
+        self._set_pill("enc", enabled)
+
     def set_uptime(self, seconds: int):
         h = seconds // 3600
         m = (seconds % 3600) // 60

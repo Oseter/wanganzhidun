@@ -154,12 +154,18 @@ class UIManager:
     def set_rec_enabled(self, enabled: bool):
         self._dispatch(lambda: self._main.set_rec_enabled(enabled))
 
+    def set_obs_enabled(self, enabled: bool):
+        self._dispatch(lambda: self._main.set_obs_enabled(enabled))
+
+    def set_enc_enabled(self, enabled: bool):
+        self._dispatch(lambda: self._main.set_enc_enabled(enabled))
+
     def add_event(self, time_str: str, source: str, keyword: str,
                   kind: str = "forensics"):
         self._dispatch(lambda: self._main.add_event(time_str, source, keyword, kind))
 
-    def set_stats(self, forensics: int, evidence: int, anti: int):
-        self._dispatch(lambda: self._main.set_stats(forensics, evidence, anti))
+    def set_stats(self, forensics: int, evidence: int, anti: int, anti_tag: int = 0):
+        self._dispatch(lambda: self._main.set_stats(forensics, evidence, anti, anti_tag))
 
     def set_uptime(self, seconds: int):
         self._dispatch(lambda: self._main.set_uptime(seconds))
