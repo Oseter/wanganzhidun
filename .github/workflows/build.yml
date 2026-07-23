@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # 从 tag 提取版本号，如 v1.4.0-beta → 1.4.0-beta；非 tag 推送用 run_number
+  APP_VER: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+
 jobs:
   # ========== 任务 1：构建 Windows EXE ==========
   build-windows:
@@ -49,7 +53,7 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
-      - name: Build installer (WangAnZhiDun-Setup.exe)
+      - name: Build installer
         working-directory: The-Preservation/Cyber-Shield/Windows
         shell: pwsh
         run: |
@@ -59,12 +63,13 @@ jobs:
           & $iscc.FullName installer.iss 2>&1
           if (-not (Test-Path installer\WangAnZhiDun-Setup.exe)) { throw "installer not found" }
 
-      - name: Prepare Windows artifacts for upload
+      - name: Rename Windows artifacts with version
         shell: pwsh
         run: |
+          $ver = "${{ env.APP_VER }}"
           New-Item -ItemType Directory -Path windows-release -Force
-          Copy-Item The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip windows-release/
-          Copy-Item The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe windows-release/
+          Copy-Item The-Preservation/Cyber-Shield/Windows/WangAnZhiDun-portable.zip "windows-release/WangAnZhiDun-$ver-portable.zip"
+          Copy-Item The-Preservation/Cyber-Shield/Windows/installer/WangAnZhiDun-Setup.exe "windows-release/WangAnZhiDun-$ver-Setup.exe"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -91,16 +96,16 @@ jobs:
           build-root-directory: The-Preservation/Cyber-Shield/Android
           arguments: ':app:assembleDebug'
 
-      - name: Rename APK
+      - name: Rename APK with version
         working-directory: The-Preservation/Cyber-Shield/Android
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk WangAnZhiDun.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "WangAnZhiDun-${{ env.APP_VER }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: The-Preservation/Cyber-Shield/Android/WangAnZhiDun.apk
+          path: The-Preservation/Cyber-Shield/Android/WangAnZhiDun-${{ env.APP_VER }}.apk
 
   # ========== 任务 3：合并发布 ==========
   release:
@@ -142,18 +147,18 @@ jobs:
             网安智盾 WangAnZhiDun 自动构建。
 
             ## Windows
-            - **WangAnZhiDun-Setup.exe**：安装包（推荐，含开始菜单/桌面快捷方式/卸载）
-            - **WangAnZhiDun-portable.zip**：免安装目录版（解压即用）
+            - **WangAnZhiDun-${{ env.APP_VER }}-Setup.exe**：安装包（推荐，含开始菜单/桌面快捷方式/卸载）
+            - **WangAnZhiDun-${{ env.APP_VER }}-portable.zip**：免安装目录版（解压即用）
 
             ## Android
-            - **WangAnZhiDun.apk**：需 Android 7.0+，需开启通知监听+无障碍服务权限
+            - **WangAnZhiDun-${{ env.APP_VER }}.apk**：需 Android 7.0+，需开启通知监听+无障碍服务权限
 
             ## 红线
             仅记录针对本人的恶意攻击，证据真实，经官方合规渠道举报；
             不伪造证据、不自动举报、不向非恶意目标使用。
           files: |
-            release-artifacts/WangAnZhiDun-portable.zip
-            release-artifacts/WangAnZhiDun-Setup.exe
-            release-artifacts/WangAnZhiDun.apk
+            release-artifacts/WangAnZhiDun-${{ env.APP_VER }}-portable.zip
+            release-artifacts/WangAnZhiDun-${{ env.APP_VER }}-Setup.exe
+            release-artifacts/WangAnZhiDun-${{ env.APP_VER }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
