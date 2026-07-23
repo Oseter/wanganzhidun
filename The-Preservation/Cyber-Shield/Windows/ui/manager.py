@@ -1,22 +1,12 @@
-"""统一 UI 管理器（UI 改进版）：网安智盾所有图形界面的唯一入口。
-
-相对旧版改进：
-    - add_event 增加 kind 参数（forensics / anti / test），支持事件列表按类型着色；
-    - ask_confirm 增加可选 evidence_files / target_account / event_time，
-      启用反伤弹窗的「标准弹药预览」与证据缩略图（向后兼容，缺省不影响旧调用）。
-
-线程安全模型不变：所有 UI 操作经 self._queue 投递到 UI 线程泵执行。
-"""
 import queue
 import threading
 from typing import Callable, Dict, Optional
 
 import tkinter as tk
 
-class UIManager:
-    """拥有唯一 Tk 根，管理主窗口 / 配置窗 / 确认弹窗。"""
 
-    POLL_MS = 40  # UI 线程泵轮询间隔
+class UIManager:
+    POLL_MS = 40
 
     def __init__(self, callbacks: Dict, start_minimized: bool = False):
         self.cb = callbacks
@@ -31,7 +21,6 @@ class UIManager:
         self._startup_error = None
         self._queue: "queue.Queue[Callable[[], None]]" = queue.Queue()
 
-    # ---------------- 生命周期 ----------------
     def start(self):
         self._ui_thread = threading.Thread(target=self._run, daemon=True)
         self._ui_thread.start()
@@ -40,9 +29,8 @@ class UIManager:
             raise RuntimeError(f"UI 初始化失败：\n{self._startup_error}")
 
     def _run(self):
-        # 延迟导入，避免打包时模块缺失导致整个 UI 线程崩溃
         try:
-            from PIL import ImageTk  # noqa: F811
+            from PIL import ImageTk
         except Exception:
             ImageTk = None
         from ui.main_window import MainWindow
@@ -51,9 +39,8 @@ class UIManager:
         try:
             self.root = tk.Tk()
             self.root.title("网安智盾 · WangAnZhiDun")
-            self.root.withdraw()  # 先隐藏，构造完再显示，避免闪烁
+            self.root.withdraw()
 
-            # Logo：ImageTk 不可用时降级跳过，不让整个窗口崩溃
             self.logo = None
             try:
                 pil = window_logo(40)
@@ -65,41 +52,25 @@ class UIManager:
             self._main = MainWindow(self.root, {**self.cb, "logo": self.logo})
             self._ready.set()
 
-            # 显示窗口：多重保证一定能弹出来
             if not self._start_minimized:
                 try:
                     self.root.deiconify()
-                except Exception:
-                    pass
-                try:
                     self.root.lift()
-                except Exception:
-                    pass
-                try:
                     self.root.focus_force()
-                except Exception:
-                    pass
-                try:
                     self.root.attributes("-topmost", True)
                     self.root.after(300, lambda: self.root.attributes("-topmost", False))
                 except Exception:
                     pass
-            # 即使最小化启动，也确保窗口已构造完毕（托盘可随时 show）
 
             self.root.after(self.POLL_MS, self._pump)
             self.root.mainloop()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             import os
             import sys
             import traceback
             from datetime import datetime
             tb = traceback.format_exc()
             self._startup_error = tb
-            try:
-                from core.logger import log
-                log.error(f"UI 线程启动失败：\n{tb}")
-            except Exception:
-                pass
             try:
                 base = os.path.dirname(os.path.abspath(sys.argv[0]))
             except Exception:
@@ -112,7 +83,6 @@ class UIManager:
                 pass
             self._ready.set()
 
-    # ---------------- UI 线程泵 ----------------
     def _pump(self):
         try:
             while True:
@@ -131,16 +101,11 @@ class UIManager:
             except Exception:
                 pass
 
-    # ---------------- 线程安全调度 ----------------
     def _dispatch(self, fn: Callable[[], None]):
         self._queue.put(fn)
 
-    def _safe(self, fn: Callable[[], None]):
-        self._dispatch(fn)
-
-    # ---------------- 主窗口显隐 ----------------
     def show(self):
-        def _do_show():
+        def _do():
             try:
                 self.root.deiconify()
                 self.root.lift()
@@ -149,7 +114,7 @@ class UIManager:
                 self.root.after(300, lambda: self.root.attributes("-topmost", False))
             except Exception:
                 pass
-        self._dispatch(_do_show)
+        self._dispatch(_do)
         refresh = self.cb.get("on_refresh")
         if callable(refresh):
             try:
@@ -182,7 +147,6 @@ class UIManager:
         except Exception:
             pass
 
-    # ---------------- 状态刷新 ----------------
     def set_running(self, running: bool):
         self._running = running
         self._dispatch(lambda: self._main.set_running(running))
@@ -192,7 +156,6 @@ class UIManager:
 
     def add_event(self, time_str: str, source: str, keyword: str,
                   kind: str = "forensics"):
-        """新增事件到列表。kind 用于着色：forensics / anti / test / info。"""
         self._dispatch(lambda: self._main.add_event(time_str, source, keyword, kind))
 
     def set_stats(self, forensics: int, evidence: int, anti: int):
@@ -205,10 +168,8 @@ class UIManager:
         self._dispatch(lambda: (self.root.clipboard_clear(),
                                 self.root.clipboard_append(text)))
 
-    # ---------------- 配置窗 ----------------
     def open_config(self, config, on_applied: Callable = None):
         from ui.config_window import ConfigWindow
-
         def build():
             if self._config_dlg is not None:
                 try:
@@ -219,22 +180,12 @@ class UIManager:
                     pass
             self._config_dlg = ConfigWindow(self.root, config, on_applied)
             self._config_dlg.show()
-
         self._dispatch(build)
 
-    # ---------------- 确认弹窗（阻塞调用线程） ----------------
     def ask_confirm(self, source_app: str, text: str, clause: str,
                     timeout: int = 30, evidence_files=None,
-                    target_account: str = "", event_time: str = "") -> bool:
-        """阻塞当前线程直到用户确认 / 放弃 / 超时，返回 (是否确认, 条款)。
-
-        新增可选参数（向后兼容）：
-            evidence_files: 证据附件路径列表（启用弹窗缩略图与预览）；
-            target_account: 目标账号（缺省由用户在举报通道填写）；
-            event_time:     取证时间字符串。
-        """
+                    target_account: str = "", event_time: str = "") -> tuple:
         from ui.confirm_dialog import ConfirmDialog
-
         result = {"ok": False, "clause": clause}
         done = threading.Event()
 

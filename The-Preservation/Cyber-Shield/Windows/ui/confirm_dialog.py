@@ -1,20 +1,3 @@
-"""反伤确认弹窗（UI 改进版）。
-
-相对旧版改进：
-    - 标准弹药完整预览：目标账号 / 时间 / 违规内容 / 对应条款 / 证据附件
-      一览无余，用户清楚「要提交的是什么」；
-    - 证据附件缩略图：截图/录像文件名 + 图片缩略图（最多 4 张）；
-    - 倒计时改进度条：视觉更直观，附剩余秒数；
-    - 键盘快捷键：Enter=确认反伤，Esc=放弃；
-    - 红线不变：程序绝不自动举报，必须用户确认才发起。
-
-实现为 Toplevel，结果经由 on_result(bool, clause) 回调返回（由 UIManager 阻塞等待）。
-
-新增可选参数（向后兼容，缺省不显示）：
-    evidence_files: 证据附件路径列表；
-    target_account: 目标账号（从通知解析，缺省「（待在举报通道填写）」）；
-    event_time:     取证时间字符串。
-"""
 import os
 import tkinter as tk
 from tkinter import ttk
@@ -30,8 +13,6 @@ C_ACCENT = "#2178c8"
 
 
 class ConfirmDialog:
-    """反伤确认弹窗（非独立 Tk，挂在主根上）。"""
-
     def __init__(self, parent: tk.Tk, source_app: str, text: str,
                  clause: str, timeout: int = 30, on_result=None,
                  evidence_files=None, target_account: str = "",
@@ -41,53 +22,44 @@ class ConfirmDialog:
         self._remain = timeout
         self._after_id = None
         self._done = False
-        self._thumbs = []  # 持有缩略图引用，避免被 GC
+        self._thumbs = []
 
         self.top = tk.Toplevel(parent)
         self.top.title("网安智盾 · 反伤确认")
-        self.top.geometry("500x480")
+        self.top.geometry("520x500")
         self.top.transient(parent)
         self.top.grab_set()
         self.top.attributes("-topmost", True)
         self.top.configure(bg=C_BG)
         self.top.protocol("WM_DELETE_WINDOW", lambda: self._finish(False))
 
-        # 头部
         ttk.Label(self.top, text="检测到疑似攻击性通知",
                   font=("Microsoft YaHei", 13, "bold"),
                   foreground=C_DANGER).pack(pady=(12, 2))
         meta = f"来源：{source_app}" + (f"    时间：{event_time}" if event_time else "")
         ttk.Label(self.top, text=meta).pack(anchor="w", padx=18)
 
-        # 违规内容（只读，可滚动）
         ttk.Label(self.top, text="违规内容：", foreground=C_SUB).pack(
             anchor="w", padx=18, pady=(6, 0))
-        txt = tk.Text(self.top, height=3, wrap="word",
-                      font=("Microsoft YaHei", 9))
+        txt = tk.Text(self.top, height=3, wrap="word", font=("Microsoft YaHei", 9))
         txt.insert("1.0", text)
         txt.configure(state="disabled")
         txt.pack(fill="x", padx=18, pady=2)
 
-        # 标准弹药预览
-        ammo = ttk.LabelFrame(self.top, text="标准弹药预览（将提交的内容）",
-                              foreground=C_TEXT)
+        ammo = ttk.LabelFrame(self.top, text="标准弹药预览（将提交的内容）", foreground=C_TEXT)
         ammo.pack(fill="x", padx=14, pady=(6, 0))
         self._ammo_row(ammo, "目标账号", target_account or "（待在举报通道填写）")
         self._ammo_row(ammo, "取证时间", event_time or "—")
         self._ammo_row(ammo, "证据附件", self._fmt_files(evidence_files))
 
-        # 证据缩略图
         if evidence_files:
             self._build_thumbs(ammo, evidence_files)
 
-        # 可编辑条款
         ttk.Label(self.top, text="对应条款（可修改）：", foreground=C_SUB).pack(
             anchor="w", padx=18, pady=(6, 0))
         self.clause_var = tk.StringVar(value=clause)
-        ttk.Entry(self.top, textvariable=self.clause_var, width=60).pack(
-            fill="x", padx=18)
+        ttk.Entry(self.top, textvariable=self.clause_var, width=60).pack(fill="x", padx=18)
 
-        # 倒计时进度条
         self._count_var = tk.StringVar(value=self._count_text())
         pf = tk.Frame(self.top, bg=C_BG)
         pf.pack(fill="x", padx=18, pady=(8, 0))
@@ -96,7 +68,6 @@ class ConfirmDialog:
         self._count = ttk.Label(pf, textvariable=self._count_var, foreground=C_SUB)
         self._count.pack(side="right")
 
-        # 按钮
         bf = ttk.Frame(self.top, bg=C_BG)
         bf.pack(pady=10)
         ttk.Button(bf, text="确认反伤举报", style="Accent.TButton",
@@ -104,11 +75,9 @@ class ConfirmDialog:
         ttk.Button(bf, text="放弃", style="Danger.TButton",
                    command=lambda: self._finish(False)).pack(side="left", padx=8)
 
-        # 键盘快捷键
         self.top.bind("<Return>", lambda e: self._finish(True))
         self.top.bind("<Escape>", lambda e: self._finish(False))
 
-    # ---------------- 辅助 ----------------
     def _ammo_row(self, parent, label: str, value: str):
         row = tk.Frame(parent, bg=C_BG)
         row.pack(fill="x", padx=8, pady=2)
@@ -121,7 +90,7 @@ class ConfirmDialog:
     def _fmt_files(self, files):
         if not files:
             return "（无）"
-        names = [os.path.basename(f) for f in files]
+        names = [os.path.basename(f) for f in files if isinstance(f, str)]
         return "；".join(names) if len(names) <= 4 else "；".join(names[:4]) + " …"
 
     def _build_thumbs(self, parent, files):

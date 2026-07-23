@@ -1,14 +1,14 @@
-"""通知监听模块：监听 Windows 通知中心（QQ/微信弹窗通知）。
+"""攻击监测：Windows 通知监听 + 频率异常检测。
 
-Windows 端使用 winrt UserNotificationListener 订阅系统通知；
-非 Windows 环境（开发/调试）降级为轮询模式：读取 injection_queue 中的
-模拟通知，便于沙箱自测，不接入任何真实账号数据。
-
-命中关键词 → 回调 on_trigger(app_name, text, timestamp)。
+- winrt UserNotificationListener 订阅系统通知
+- 非 Windows 环境降级为轮询模式（injection_queue.txt）
+- 命中关键词 → 回调 on_trigger
 """
 import platform
 import threading
 import time
+from collections import deque
+from datetime import datetime
 from typing import Callable, Optional
 
 from .logger import log
@@ -16,8 +16,6 @@ from .keyword_engine import KeywordEngine
 
 
 class NotificationMonitor:
-    """通知监听器，跨平台降级。"""
-
     def __init__(self, keyword_engine: KeywordEngine,
                  on_trigger: Callable[[str, str, float], None]):
         self.kw = keyword_engine
@@ -26,22 +24,17 @@ class NotificationMonitor:
         self._thread: Optional[threading.Thread] = None
         self._listener = None
 
-    # ---------------- Windows 实现 ----------------
     def _setup_winrt(self) -> bool:
         try:
             from winrt.windows.ui.notifications.management import (
-                UserNotificationListener,
-                NotificationListenerAccessStatus,
+                UserNotificationListener, NotificationListenerAccessStatus,
             )
             from winrt.windows.ui.notifications import NotificationKinds
             self._listener = UserNotificationListener.current()
-            # request_access() 返回 IAsyncOperation（异步），必须等待结果后再判定。
-            # 本方法运行于同步上下文（无事件循环），用 .get() 阻塞等待其完成，
-            # 否则 acc 拿到的只是未完成的异步句柄，acc != 1 判定会失效（W4 修复）。
             op = self._listener.request_access()
             status = op.get() if hasattr(op, "get") else op
             if status != NotificationListenerAccessStatus.ALLOWED:
-                log.warning("通知监听未获授权（需在系统设置中允许）。")
+                log.warning("通知监听未获授权")
                 return False
 
             def _on_added(sender, args):
@@ -73,18 +66,15 @@ class NotificationMonitor:
         except Exception:
             return ""
 
-    # ---------------- 通用分发 ----------------
     def _dispatch(self, app: str, text: str):
         hit = self.kw.match(text)
         if hit:
-            log.info(f"命中关键词[{hit}] 来自 {app}: {text[:40]}")
+            log.info(f"命中关键词[{hit}] 来自 {app}")
             self.on_trigger(app, text, time.time())
 
-    # ---------------- 轮询降级（开发/调试） ----------------
     def _poll_loop(self, queue_path: str = "injection_queue.txt"):
-        """读取注入队列中的模拟通知（每行：app|text）。"""
-        import os
         seen = 0
+        import os
         while self._running:
             if os.path.exists(queue_path):
                 try:
@@ -101,13 +91,12 @@ class NotificationMonitor:
                     log.debug(f"轮询读取异常：{e}")
             time.sleep(1)
 
-    # ---------------- 生命周期 ----------------
     def start(self):
         self._running = True
         if platform.system() == "Windows" and self._setup_winrt():
-            log.info("通知监听已启动（winrt 模式）。")
+            log.info("通知监听已启动（winrt）")
             return
-        log.info("通知监听已启动（轮询降级模式）。")
+        log.info("通知监听已启动（轮询降级）")
         self._thread = threading.Thread(target=self._poll_loop, daemon=True)
         self._thread.start()
 
@@ -115,3 +104,34 @@ class NotificationMonitor:
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
+
+
+class FrequencyMonitor:
+    """频率监控：防点号用，检测异常加好友/临时会话/拉群。"""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._windows: dict = {}
+
+    def _window(self, key: str, window_seconds: int) -> deque:
+        if key not in self._windows:
+            self._windows[key] = deque(maxlen=1000)
+        return self._windows[key]
+
+    def record(self, event_type: str, window_seconds: int):
+        now = time.time()
+        key = event_type
+        with self._lock:
+            w = self._window(key, window_seconds)
+            w.append(now)
+            while w and w[0] < now - window_seconds:
+                w.popleft()
+            return len(w)
+
+    def count(self, event_type: str, window_seconds: int) -> int:
+        now = time.time()
+        with self._lock:
+            w = self._window(event_type, window_seconds)
+            while w and w[0] < now - window_seconds:
+                w.popleft()
+            return len(w)
