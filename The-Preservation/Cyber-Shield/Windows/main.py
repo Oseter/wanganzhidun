@@ -232,7 +232,7 @@ class WangAnZhiDun:
             r.withdraw()
             messagebox.showinfo(
                 "关于网安智盾",
-                "网安智盾 WangAnZhiDun · v1.4 测试版\n"
+                "网安智盾 WangAnZhiDun · v1.5 测试版\n"
                 "存护命途 · 防打号 / 防点号 / 反伤\n\n"
                 "个人防御型取证工具：仅记录针对本人的恶意攻击。\n\n"
                 "功能：防打号检测、防点号频率监控、多屏截图、\n"
