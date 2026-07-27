@@ -38,6 +38,8 @@ jobs:
 
       - name: Fix PE checksum (降低杀软误报)
         working-directory: The-Preservation/Cyber-Shield/Windows
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           pip install pefile
           python tools/fix_pe_checksum.py

@@ -54,9 +54,11 @@ class TrayApp:
         icon.update_menu()
 
     def _quit(self, icon):
-        if self.on_quit:
-            self.on_quit()
-        icon.stop()
+        try:
+            if self.on_quit:
+                self.on_quit()
+        finally:
+            icon.stop()
 
     def _run(self):
         import pystray

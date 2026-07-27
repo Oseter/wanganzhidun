@@ -17,13 +17,13 @@ def fix_checksum(exe_path: str):
         old = pe.OPTIONAL_HEADER.CheckSum
         pe.OPTIONAL_HEADER.CheckSum = pe.generate_checksum()
         pe.write(exe_path)
-        print(f"校验和：{old} → {pe.OPTIONAL_HEADER.CheckSum}")
+        print(f"Checksum: {old} -> {pe.OPTIONAL_HEADER.CheckSum}")
         return True
     except ImportError:
-        print("pefile 未安装，跳过校验和修复。pip install pefile")
+        print("pefile not installed, skip checksum fix. pip install pefile")
         return False
     except Exception as e:
-        print(f"校验和修复失败：{e}")
+        print(f"Checksum fix failed: {e}")
         return False
 
 

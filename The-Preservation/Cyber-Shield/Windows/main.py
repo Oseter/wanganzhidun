@@ -154,7 +154,7 @@ def _run_ui_process(engine_stdin, engine_stdout, start_minimized: bool):
         "on_toggle": lambda: _send(engine_stdout, {"type": "toggle"}),
         "on_test": lambda: _send(engine_stdout, {"type": "test"}),
         "on_quit": lambda: _send(engine_stdout, {"type": "shutdown"}),
-        "on_close": lambda: _send(engine_stdout, {"type": "hide"}),
+        "on_close": lambda: _ui.hide(),
     }
 
     _ui = UIManager(callbacks, start_minimized=start_minimized)
