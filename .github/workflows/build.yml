@@ -36,6 +36,12 @@ jobs:
         working-directory: The-Preservation/Cyber-Shield/Windows
         run: pyinstaller build.spec
 
+      - name: Fix PE checksum (降低杀软误报)
+        working-directory: The-Preservation/Cyber-Shield/Windows
+        run: |
+          pip install pefile
+          python tools/fix_pe_checksum.py
+
       - name: Sign exe (Authenticode)
         if: false
         working-directory: The-Preservation/Cyber-Shield/Windows
