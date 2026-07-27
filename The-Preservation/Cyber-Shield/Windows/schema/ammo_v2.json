@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "标准弹药 v2",
+  "type": "object",
+  "required": ["version", "ammo_type", "target_account", "violation_content", "clause"],
+  "properties": {
+    "version": { "type": "string", "enum": ["v2"] },
+    "ammo_type": { "type": "string", "enum": ["personal", "group"] },
+    "target_account": { "type": "string" },
+    "target_platform": { "type": "string" },
+    "violation_time": { "type": "string", "format": "date-time" },
+    "violation_content": { "type": "string" },
+    "clause": { "type": "string" },
+    "evidence_attachments": {
+      "type": "object",
+      "properties": {
+        "screenshots": { "type": "array", "items": { "type": "string" } },
+        "replay": { "type": "string" },
+        "raw_text": { "type": "string" }
+      }
+    },
+    "reporter_info": {
+      "type": "object",
+      "properties": {
+        "tool": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "source_app": { "type": "string" },
+        "collected_at": { "type": "string", "format": "date-time" },
+        "collection_method": { "type": "string" }
+      }
+    },
+    "related_groups": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "关联群列表（追加论输出）"
+    },
+    "attack_chain_topology": {
+      "type": "object",
+      "description": "攻击链拓扑"
+    },
+    "multi_target_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "多目标标签"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "标准弹药 v1 个人版",
+  "type": "object",
+  "required": ["version", "ammo_type", "target_account", "violation_content", "clause"],
+  "properties": {
+    "version": { "type": "string", "enum": ["v1"] },
+    "ammo_type": { "type": "string", "enum": ["personal"] },
+    "target_account": { "type": "string", "description": "目标账号" },
+    "target_platform": { "type": "string", "description": "目标平台" },
+    "violation_time": { "type": "string", "format": "date-time" },
+    "violation_content": { "type": "string", "description": "违规内容原文" },
+    "clause": { "type": "string", "description": "对应条款" },
+    "evidence_attachments": {
+      "type": "object",
+      "properties": {
+        "screenshots": { "type": "array", "items": { "type": "string" } },
+        "replay": { "type": "string" },
+        "raw_text": { "type": "string" }
+      }
+    },
+    "reporter_info": {
+      "type": "object",
+      "properties": {
+        "tool": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "source_app": { "type": "string" },
+        "collected_at": { "type": "string", "format": "date-time" },
+        "collection_method": { "type": "string" }
+      }
+    }
+  }
+}

@@ -130,11 +130,19 @@ class ConfigManager:
 
     # --- 反伤 ---
     @property
+    def attack_keywords(self) -> List[str]:
+        raw = self.get("anti_strike", "attack_keywords", fallback="")
+        if not raw:
+            return ["举报你", "恶意举报", "封你", "搞你", "炸你"]
+        return [k.strip() for k in raw.split(",") if k.strip()]
+
+    @property
     def anti_strike(self) -> dict:
         return {
             "enabled": self.get_bool("anti_strike", "enabled", False),
             "confirm_timeout": self.get_int("anti_strike", "confirm_timeout", 30),
             "require_attack_keyword": self.get_bool("anti_strike", "require_attack_keyword", True),
+            "attack_keywords": self.attack_keywords,
         }
 
     # --- 标准弹药 ---

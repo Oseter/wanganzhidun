@@ -12,6 +12,7 @@ _console = "--console" in sys.argv[1:]
 collected_binaries = []
 collected_datas = []
 collected_hiddenimports = [
+    # 运行时库
     "winrt",
     "winrt.windows.ui.notifications.management",
     "winrt.windows.ui.notifications",
@@ -32,6 +33,41 @@ collected_hiddenimports = [
     "ctypes",
     "logging",
     "obswebsocket",
+    # 原子模块（monitor / forensics / ammo / channel / defense）
+    "monitor.keyword_match",
+    "monitor.freq_detect",
+    "monitor.notify_listener",
+    "forensics.screenshot",
+    "forensics.screen_record",
+    "forensics.chat_export",
+    "forensics.metadata_gen",
+    "forensics.archive",
+    "ammo.personal_ammo",
+    "ammo.group_ammo",
+    "ammo.ammo_v2",
+    "ammo.keyword_theory",
+    "ammo.additive_theory",
+    "ammo.category_map",
+    "channel.base",
+    "channel.manager",
+    "channel.ch_12377_web",
+    "channel.ch_email",
+    "channel.ch_guard",
+    "channel.ch_provincial",
+    "channel.ch_miit",
+    "channel.ch_12377_app",
+    "channel.ch_weixin_gzh",
+    "channel.ch_weibo_dm",
+    "channel.ch_12377_hotline",
+    "channel.ch_cyberpolice",
+    "channel.health_probe",
+    "channel.channel_degrade",
+    "defense.harden_check",
+    "defense.interface_lock",
+    "defense.group_ctrl",
+    "core.event_bus",
+    "core.workflow",
+    "core.threat_score",
 ]
 
 for _pkg in ("cryptography", "pystray", "mss", "obswebsocket"):

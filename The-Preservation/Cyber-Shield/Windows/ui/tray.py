@@ -9,7 +9,7 @@ class TrayApp:
                  on_settings: Callable = None, on_open_evidence: Callable = None,
                  on_toggle: Callable = None, on_quit: Callable = None,
                  on_test: Callable = None, on_about: Callable = None,
-                 on_reload: Callable = None):
+                 on_reload: Callable = None, on_hardening: Callable = None):
         self.evidence_dir = evidence_dir
         self.ui = ui
         self.on_settings = on_settings
@@ -19,6 +19,7 @@ class TrayApp:
         self.on_test = on_test
         self.on_about = on_about
         self.on_reload = on_reload
+        self.on_hardening = on_hardening
         self._running = True
         self._icon = None
         self._thread = None
@@ -31,6 +32,7 @@ class TrayApp:
             MenuItem("显示主窗口", lambda i, it: self.ui and self.ui.show()),
             MenuItem("打开证据目录", lambda i, it: os.startfile(self.evidence_dir) if os.name == "nt" else os.system(f'xdg-open "{self.evidence_dir}"')),
             MenuItem("设置", lambda i, it: self.on_settings() if self.on_settings else None),
+            MenuItem("账号加固", lambda i, it: self.on_hardening() if self.on_hardening else None),
         ]
         if self.on_test:
             items.append(MenuItem("立即测试取证", lambda i, it: self.on_test()))
