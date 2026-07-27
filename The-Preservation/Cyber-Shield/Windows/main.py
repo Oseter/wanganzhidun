@@ -23,7 +23,10 @@ def _early_msgbox(title: str, message: str):
 
 def _send(pipe, msg: dict):
     line = json.dumps(msg, ensure_ascii=False) + "\n"
-    pipe.write(line.encode("utf-8"))
+    if hasattr(pipe, "encoding"):
+        pipe.write(line)
+    else:
+        pipe.write(line.encode("utf-8"))
     pipe.flush()
 
 
@@ -31,6 +34,8 @@ def _recv(pipe) -> dict:
     line = pipe.readline()
     if not line:
         raise EOFError("pipe closed")
+    if isinstance(line, bytes):
+        line = line.decode("utf-8")
     return json.loads(line)
 
 
