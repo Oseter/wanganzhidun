@@ -84,7 +84,7 @@ def main():
         f.write(f"网安智盾 误报申诉信息\n")
         f.write(f"{'='*50}\n")
         f.write(f"软件名称：网安智盾 WangAnZhiDun\n")
-        f.write(f"版本：v1.5.0-beta\n")
+        f.write(f"版本：v1.6.0-beta\n")
         f.write(f"源码：https://github.com/Oseter/wanganzhidun\n")
         f.write(f"说明：PyInstaller 打包的 Python 桌面应用，用于恶俗攻击防御取证\n")
         if info["exists"]:
